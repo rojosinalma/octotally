@@ -76,23 +76,33 @@ query RoleIds($q: String!, $first: Int!, $after: String, $type: SearchType!) {
 }`;
 
 /** Search qualifiers that establish a role, per search type. Author is read from the node itself. */
+/**
+ * Issue/PR searches always carry `is:issue` or `is:pr`: with a fine-grained PAT GitHub silently
+ * returns zero results for an untyped query (classic/OAuth tokens do not need it), so every
+ * ISSUE_ADVANCED search runs once per kind.
+ */
+export type IssueKind = 'issue' | 'pr';
+export const ISSUE_KINDS: IssueKind[] = ['issue', 'pr'];
+
 export const ROLE_SEARCHES: {
   role: 'assigned' | 'mentioned' | 'commenter' | 'reviewer';
   qualifier: string;
   type: 'ISSUE_ADVANCED' | 'DISCUSSION';
+  /** Restrict a role search to one kind (review qualifiers only make sense for PRs). */
+  kinds?: IssueKind[];
 }[] = [
   { role: 'assigned', qualifier: 'assignee', type: 'ISSUE_ADVANCED' },
   { role: 'mentioned', qualifier: 'mentions', type: 'ISSUE_ADVANCED' },
   { role: 'commenter', qualifier: 'commenter', type: 'ISSUE_ADVANCED' },
-  { role: 'reviewer', qualifier: 'review-requested', type: 'ISSUE_ADVANCED' },
-  { role: 'reviewer', qualifier: 'reviewed-by', type: 'ISSUE_ADVANCED' },
+  { role: 'reviewer', qualifier: 'review-requested', type: 'ISSUE_ADVANCED', kinds: ['pr'] },
+  { role: 'reviewer', qualifier: 'reviewed-by', type: 'ISSUE_ADVANCED', kinds: ['pr'] },
   { role: 'commenter', qualifier: 'commenter', type: 'DISCUSSION' },
 ];
 
-export function involvesQuery(login: string): string {
-  return `involves:${login} sort:updated-desc`;
+export function involvesQuery(login: string, kind?: IssueKind): string {
+  return `${kind ? `is:${kind} ` : ''}involves:${login} sort:updated-desc`;
 }
 
-export function roleQuery(qualifier: string, login: string): string {
-  return `${qualifier}:${login} sort:updated-desc`;
+export function roleQuery(qualifier: string, login: string, kind?: IssueKind): string {
+  return `${kind ? `is:${kind} ` : ''}${qualifier}:${login} sort:updated-desc`;
 }

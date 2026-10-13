@@ -129,13 +129,19 @@ describe('fetchSnapshot', () => {
     const snap = await fetchSnapshot(gh);
     expect(snap.login).toBe('octocat');
     expect(snap.items.map((i) => i.type).sort()).toEqual(['discussion', 'issue', 'issue', 'pr']);
-    expect(snap.counts).toMatchObject({ issues: 2, prs: 1, discussions: 1, unknownNodes: 1 });
+    expect(snap.counts).toMatchObject({ issues: 2, prs: 1, discussions: 1, unknownNodes: 2 }); // the fixture page is served for both kinds
     expect([...must(snap.roles.get('I_kwDOAbCdEf5xyz001'))].sort()).toEqual(['author', 'commenter']);
     expect([...must(snap.roles.get('I_kwDOAbCdEf5xyz002'))].sort()).toEqual(['assigned']);
     expect([...must(snap.roles.get('PR_kwDOAbCdEf5abc001'))].sort()).toEqual(['mentioned', 'reviewer']);
     expect([...must(snap.roles.get('D_kwDOAbCdEf4def001'))].sort()).toEqual(['commenter']);
-    expect(calls.filter((c) => c.operation === 'RoleIds')).toHaveLength(6);
-    expect(calls.find((c) => c.operation === 'InvolvedIssues')?.variables.q).toBe(
+    // assignee/mentions/commenter × {issue, pr} + review-requested/reviewed-by (pr only) + discussion commenter
+    expect(calls.filter((c) => c.operation === 'RoleIds')).toHaveLength(9);
+    // Fine-grained PATs return nothing for untyped searches, so every issue/PR search is typed.
+    expect(calls.filter((c) => c.operation === 'InvolvedIssues').map((c) => c.variables.q)).toEqual([
+      'is:issue involves:octocat sort:updated-desc',
+      'is:pr involves:octocat sort:updated-desc',
+    ]);
+    expect(calls.find((c) => c.operation === 'InvolvedDiscussions')?.variables.q).toBe(
       'involves:octocat sort:updated-desc',
     );
   });
@@ -158,7 +164,7 @@ describe('fetchSnapshot', () => {
     );
     const snap = await fetchSnapshot(gh);
     const issueCalls = calls.filter((c) => c.operation === 'InvolvedIssues');
-    expect(issueCalls).toHaveLength(2);
+    expect(issueCalls).toHaveLength(3); // is:issue page 1 + page 2, is:pr page 1
     expect(issueCalls[1]?.variables.after).toBe('c1');
     expect(snap.items.filter((i) => i.type !== 'discussion')).toHaveLength(3); // deduped by id
   });
