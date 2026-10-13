@@ -3,6 +3,7 @@ import { matchesItem, parseSearch, substituteSettings, tokenize } from '@octotal
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ItemAction } from '../api';
 import { FilterChips } from '../components/FilterChips';
+import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
 import { ItemList } from '../components/ItemList';
 import { ItemPanel } from '../components/ItemPanel';
@@ -239,6 +240,7 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
+      <Footer />
     </div>
   );
 }
