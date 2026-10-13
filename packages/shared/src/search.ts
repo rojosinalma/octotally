@@ -13,7 +13,7 @@ import type { Hidden, Item, ItemState, ItemType, Role, Settings } from './types'
  *   updated:>14d  updated:>=2026-01-01  created:<2w  activity:>1mo  (d w mo y; .. ranges)
  *   (`updated` and `activity` both compare the item's last known activity)
  *   comments:>5
- *   hidden:none|muted|done|any            (local, defaults to none when absent)
+ *   hidden:none|muted|done|hidden|any     (local; `hidden` = muted or done; defaults to none when absent)
  *   sort:updated-desc|updated-asc|created-desc|created-asc|comments-desc
  *   "quoted text" or bare words           → title match (case-insensitive)
  *
@@ -67,7 +67,7 @@ export interface ParsedSearch {
   created: DateExpr[];
   activity: DateExpr[];
   comments: NumExpr[];
-  hidden: Hidden | 'any';
+  hidden: Hidden | 'hidden' | 'any';
   sort: SortKey;
   /** Tokens the grammar did not understand, kept so the UI can flag them. */
   unknown: string[];
@@ -306,7 +306,13 @@ export function parseSearch(query: string, opts: ParseOptions = {}): ParsedSearc
         break;
       }
       case 'hidden':
-        if (lower === 'none' || lower === 'muted' || lower === 'done' || lower === 'any') {
+        if (
+          lower === 'none' ||
+          lower === 'muted' ||
+          lower === 'done' ||
+          lower === 'hidden' ||
+          lower === 'any'
+        ) {
           p.hidden = lower;
           hiddenSet = true;
         } else p.unknown.push(token);
@@ -343,7 +349,7 @@ function cmpDate(value: string, e: DateExpr): boolean {
     case '<=':
       return v <= from;
     case '=':
-      return Math.abs(v - from) < UNIT_MS.d!;
+      return Math.abs(v - from) < (UNIT_MS.d as number);
     case '..':
       return v >= from && v <= Date.parse(e.to as string);
   }
@@ -366,7 +372,9 @@ function cmpNum(value: number, e: NumExpr): boolean {
 
 /** Pure predicate shared by server filtering and client-side previews. */
 export function matchesItem(p: ParsedSearch, item: Item): boolean {
-  if (p.hidden !== 'any' && item.hidden !== p.hidden) return false;
+  if (p.hidden === 'hidden') {
+    if (item.hidden === 'none') return false;
+  } else if (p.hidden !== 'any' && item.hidden !== p.hidden) return false;
   if (p.types.size && !p.types.has(item.type)) return false;
   if (p.notTypes.has(item.type)) return false;
   if (p.states.size && !p.states.has(item.state)) return false;
@@ -424,10 +432,17 @@ export function sortItems(items: Item[], sort: SortKey): Item[] {
 }
 
 /** Filter + sort in one call; what the server does for `GET /api/items?q=`. */
-export function applySearch(items: Item[], query: string, opts: ParseOptions & { settings?: Settings } = {}): Item[] {
+export function applySearch(
+  items: Item[],
+  query: string,
+  opts: ParseOptions & { settings?: Settings } = {},
+): Item[] {
   const q = opts.settings ? substituteSettings(query, opts.settings) : query;
   const p = parseSearch(q, opts);
-  return sortItems(items.filter((i) => matchesItem(p, i)), p.sort);
+  return sortItems(
+    items.filter((i) => matchesItem(p, i)),
+    p.sort,
+  );
 }
 
 /** Qualifier names, for autocomplete. */

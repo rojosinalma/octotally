@@ -1,0 +1,21 @@
+# Octotally — copy this file to docker-compose.yml next to a `.env` (see .env.example) and run:
+#   docker compose up -d
+# Then open http://localhost:3000
+services:
+  octotally:
+    image: ghcr.io/rojosinalma/octotally:latest
+    container_name: octotally
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # SQLite database and nothing else; keep it on local disk (not NFS).
+      - ./data:/data
+    # Environment variables (all read from .env — never put the token in this file):
+    #   GITHUB_TOKEN     required  fine-grained PAT, read-only: Issues, Pull requests, Discussions, Metadata
+    #   AUTH_PASSWORD    optional  single password protecting the UI (leave empty when a reverse proxy does auth)
+    #   SESSION_SECRET   optional  random string signing the login cookie (required when AUTH_PASSWORD is set)
+    #   API_TOKEN        optional  bearer token for /api/* clients (scripts, agents)
+    #   LOG_LEVEL        optional  trace|debug|info|warn|error|fatal|silent (default info)
+    #   PORT / DATA_DIR  baked into the image (3000, /data); only change together with ports/volumes above
+    env_file: .env

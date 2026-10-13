@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a change or an addition
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that Octotally does not let you do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should it work? A search qualifier, a settings key, a notifier, a view…
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Dashboard / UI
+        - Search syntax
+        - Relevance rules (active / needs PR)
+        - Digest / notifiers
+        - API
+        - Authentication
+        - Docker / deployment
+        - Other
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This stays read-only against GitHub (write actions are a separate roadmap item).
+        - label: I searched existing issues and discussions.

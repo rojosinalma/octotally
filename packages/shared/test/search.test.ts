@@ -8,6 +8,7 @@ import {
   parseSearch,
   substituteSettings,
   tokenize,
+  type View,
 } from '../src';
 
 const NOW = new Date('2026-10-13T12:00:00Z');
@@ -91,10 +92,23 @@ describe('parseSearch', () => {
 
 describe('matchesItem', () => {
   const open = item();
-  const merged = item({ id: 'PR_1', type: 'pr', state: 'merged', updatedAt: daysAgo(60), lastActivityAt: daysAgo(60) });
+  const merged = item({
+    id: 'PR_1',
+    type: 'pr',
+    state: 'merged',
+    updatedAt: daysAgo(60),
+    lastActivityAt: daysAgo(60),
+  });
   const withPr = item({
     id: 'I_2',
-    linkedPrs: [{ number: 9, url: 'https://github.com/maziggy/bambuddy/pull/9', state: 'open', repo: 'maziggy/bambuddy' }],
+    linkedPrs: [
+      {
+        number: 9,
+        url: 'https://github.com/maziggy/bambuddy/pull/9',
+        state: 'open',
+        repo: 'maziggy/bambuddy',
+      },
+    ],
   });
   const muted = item({ id: 'I_3', hidden: 'muted', hiddenAt: daysAgo(1), mutedActivityAt: daysAgo(2) });
   const discussion = item({ id: 'D_1', type: 'discussion', isAnswered: false, roles: ['commenter'] });
@@ -118,6 +132,8 @@ describe('matchesItem', () => {
     expect(matchesItem(parseSearch('hidden:muted'), muted)).toBe(true);
     expect(matchesItem(parseSearch('hidden:any'), muted)).toBe(true);
     expect(matchesItem(parseSearch('hidden:any'), open)).toBe(true);
+    expect(matchesItem(parseSearch('hidden:hidden'), muted)).toBe(true);
+    expect(matchesItem(parseSearch('hidden:hidden'), open)).toBe(false);
   });
 
   test('roles, labels, repo, text', () => {
@@ -131,7 +147,10 @@ describe('matchesItem', () => {
 
 describe('views and settings substitution', () => {
   test('built-in Active view substitutes the window', () => {
-    const q = substituteSettings(BUILTIN_VIEWS[0]!.query, { ...DEFAULT_SETTINGS, activeWindowDays: 7 });
+    const q = substituteSettings((BUILTIN_VIEWS[0] as View).query, {
+      ...DEFAULT_SETTINGS,
+      activeWindowDays: 7,
+    });
     expect(q).toBe('updated:>7d hidden:none');
   });
 
@@ -139,7 +158,10 @@ describe('views and settings substitution', () => {
     const a = item({ id: 'a', lastActivityAt: daysAgo(5) });
     const b = item({ id: 'b', lastActivityAt: daysAgo(1) });
     const c = item({ id: 'c', lastActivityAt: daysAgo(90) });
-    const out = applySearch([a, b, c], 'updated:>{activeWindowDays}d', { now: NOW, settings: DEFAULT_SETTINGS });
+    const out = applySearch([a, b, c], 'updated:>{activeWindowDays}d', {
+      now: NOW,
+      settings: DEFAULT_SETTINGS,
+    });
     expect(out.map((i) => i.id)).toEqual(['b', 'a']);
     expect(applySearch([a, b], 'sort:updated-asc', { now: NOW }).map((i) => i.id)).toEqual(['a', 'b']);
   });
