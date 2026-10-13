@@ -48,14 +48,16 @@ describe('auth middleware', () => {
   test('open when neither API_TOKEN nor AUTH_PASSWORD is set', () => {
     expect(apiAllowed(env(), SECRET, undefined, undefined)).toBe(true);
   });
-  test('API_TOKEN: fail closed, bearer must match exactly', () => {
+  test('API_TOKEN alone never locks the browser out; the bearer must match exactly', () => {
     const e = env({ API_TOKEN: 'abc' });
-    expect(apiAllowed(e, SECRET, undefined, undefined)).toBe(false);
-    expect(apiAllowed(e, SECRET, 'Bearer ab', undefined)).toBe(false);
-    expect(apiAllowed(e, SECRET, 'Bearer abcd', undefined)).toBe(false);
-    expect(apiAllowed(e, SECRET, 'Basic abc', undefined)).toBe(false);
+    expect(apiAllowed(e, SECRET, undefined, undefined)).toBe(true);
     expect(apiAllowed(e, SECRET, 'Bearer abc', undefined)).toBe(true);
     expect(apiAllowed(e, SECRET, 'bearer abc', undefined)).toBe(true);
+    const gated = env({ API_TOKEN: 'abc', AUTH_PASSWORD: 'pw' });
+    expect(apiAllowed(gated, SECRET, 'Bearer ab', undefined)).toBe(false);
+    expect(apiAllowed(gated, SECRET, 'Bearer abcd', undefined)).toBe(false);
+    expect(apiAllowed(gated, SECRET, 'Basic abc', undefined)).toBe(false);
+    expect(apiAllowed(gated, SECRET, 'Bearer abc', undefined)).toBe(true);
   });
   test('AUTH_PASSWORD: a valid cookie passes, a forged or expired one does not', () => {
     const e = env({ AUTH_PASSWORD: 'pw' });
@@ -73,7 +75,7 @@ describe('auth middleware', () => {
   });
 
   test('HTTP: 401 envelope on /api, /health stays open', async () => {
-    const { req } = await build({ API_TOKEN: 'x' });
+    const { req } = await build({ API_TOKEN: 'x', AUTH_PASSWORD: 'pw' });
     const r = await req('/api/items');
     expect(r.status).toBe(401);
     expect(r.body).toEqual({ ok: false, kind: 'auth', message: 'authentication required' });

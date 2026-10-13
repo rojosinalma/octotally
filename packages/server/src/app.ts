@@ -25,9 +25,10 @@ export interface AppDeps {
 
 /**
  * Auth decision for /api/*:
- *  - API_TOKEN set and a matching bearer → allowed
- *  - AUTH_PASSWORD set and a valid session cookie → allowed
- *  - neither variable set → open (document: put it behind your proxy's auth)
+ *  - a bearer matching API_TOKEN (when set) → allowed, always
+ *  - AUTH_PASSWORD set → a valid session cookie is required for everything else
+ *  - AUTH_PASSWORD not set → open (document: put it behind your proxy's auth);
+ *    API_TOKEN alone adds a machine credential without locking the browser out
  *  - otherwise 401. `/health` and `/auth/*` never go through this.
  */
 export function apiAllowed(
@@ -36,13 +37,12 @@ export function apiAllowed(
   auth: string | undefined,
   cookie: string | undefined,
 ): boolean {
-  if (!env.API_TOKEN && !env.AUTH_PASSWORD) return true;
   if (env.API_TOKEN) {
     const token = bearerToken(auth);
     if (token && safeEqual(token, env.API_TOKEN)) return true;
   }
-  if (env.AUTH_PASSWORD && verifySession(secret, cookie)) return true;
-  return false;
+  if (!env.AUTH_PASSWORD) return true;
+  return verifySession(secret, cookie);
 }
 
 export function createApp(deps: AppDeps) {

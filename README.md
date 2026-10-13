@@ -78,7 +78,7 @@ Octotally never writes to GitHub, so a read-only token is enough.
 | `GITHUB_TOKEN` | yes | – | Personal access token (see above). Without it the UI shows an onboarding card and `/health` is degraded |
 | `AUTH_PASSWORD` | no | – | Single password for the UI. Leave empty when a reverse proxy authenticates |
 | `SESSION_SECRET` | with `AUTH_PASSWORD` | – | Signs the login cookie (`openssl rand -hex 32`) |
-| `API_TOKEN` | no | – | Bearer token for `/api/*`; when set, requests without it are rejected |
+| `API_TOKEN` | no | – | Bearer token scripts can use on `/api/*`; always accepted, never required for the browser |
 | `LOG_LEVEL` | no | `info` | `trace` `debug` `info` `warn` `error` `fatal` `silent` |
 | `PORT` | no | `3000` | Listen port (set in the image) |
 | `DATA_DIR` | no | `/data` in the image, `./data` locally | SQLite database location |
@@ -173,8 +173,8 @@ Octotally is single-user. Pick one:
 2. **`AUTH_PASSWORD`** — a login form and a signed session cookie (`SESSION_SECRET` required).
 3. **Reverse proxy** — Cloudflare Access, Authelia, Authentik, oauth2-proxy… in front of the
    container; leave `AUTH_PASSWORD` empty.
-4. **`API_TOKEN`** — for scripts: `Authorization: Bearer <token>` on `/api/*`. Independent of the
-   UI gate; when set, the API fails closed.
+4. **`API_TOKEN`** — for scripts: `Authorization: Bearer <token>` on `/api/*`. An extra credential
+   next to the UI gate; it never blocks the browser (the gate is `AUTH_PASSWORD` or your proxy).
 
 GitHub OAuth login (no PAT) is on the roadmap; the token source is a single interface so it can be
 added without touching the rest.

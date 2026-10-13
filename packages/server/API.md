@@ -14,7 +14,7 @@ Action routes never redirect. Shapes below reference the zod schemas in `package
 | `DATA_DIR`       | `./data`                        | SQLite file `octotally.db` and `session.secret` live here. |
 | `GITHUB_TOKEN`   | –                               | PAT (read: issues, PRs, discussions, metadata). Without it the app boots, serves everything and reports an onboarding error in `/api/status`. |
 | `AUTH_PASSWORD`  | –                               | When set, `/api/*` needs a session cookie from `POST /auth/login`. |
-| `API_TOKEN`      | –                               | When set, `/api/*` accepts `Authorization: Bearer <token>` (constant-time compare). |
+| `API_TOKEN`      | –                               | Machine credential: `/api/*` accepts `Authorization: Bearer <token>` (constant-time compare) in addition to the UI gate. |
 | `SESSION_SECRET` | generated, persisted in `DATA_DIR/session.secret` (0600) | HMAC key for the session cookie. |
 | `LOG_LEVEL`      | `info`                          | pino level: `trace` … `fatal`, `silent`. |
 | `WEB_DIST`       | `packages/web/dist`             | Built SPA; served statically with `index.html` fallback when present. |
@@ -26,10 +26,9 @@ Tokens are never logged.
 
 | Situation | `/api/*` access |
 |---|---|
-| neither `API_TOKEN` nor `AUTH_PASSWORD` set | open — put the instance behind your proxy's auth |
-| `API_TOKEN` set | `Authorization: Bearer <API_TOKEN>` |
+| `AUTH_PASSWORD` not set | open — put the instance behind your proxy's auth |
 | `AUTH_PASSWORD` set | valid `octotally_session` cookie (HttpOnly, SameSite=Lax, 30 days, `Secure` when the request is https or `X-Forwarded-Proto: https`) |
-| both set | either credential |
+| `API_TOKEN` set (either case) | `Authorization: Bearer <API_TOKEN>` is always accepted as an alternative; it never locks the browser out |
 
 Anything else → `401 {ok:false, kind:"auth", message:"authentication required"}`. `/health` and
 `/auth/*` are never gated. The SPA bundle is served regardless (it carries no data); the SPA
