@@ -20,6 +20,22 @@ body {
   min-height: 100vh;
 }
 
+.app-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px 20px;
+  font-size: 12px;
+  border-top: 1px solid var(--borderColor-muted);
+}
+
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .app-loading {
   display: grid;
   place-items: center;

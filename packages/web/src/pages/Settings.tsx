@@ -4,6 +4,7 @@ import { AlertIcon, CheckCircleIcon, PaperAirplaneIcon } from '@primer/octicons-
 import { Button, FormControl, Heading, Label, Select, TextInput, ToggleSwitch } from '@primer/react';
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { api } from '../api';
+import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
 import { useApp } from '../hooks/useApp';
 import { useToast } from '../hooks/useToast';
@@ -426,6 +427,7 @@ export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void 
           </Row>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }
