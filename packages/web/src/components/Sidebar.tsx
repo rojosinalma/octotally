@@ -156,7 +156,7 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
         <h3 className="facet-heading" id="facet-type">
           Type
         </h3>
-        <ActionList selectionVariant="multiple" aria-labelledby="facet-type">
+        <ActionList role="listbox" selectionVariant="multiple" aria-labelledby="facet-type">
           {TYPE_FACETS.map(([token, label]) => (
             <ActionList.Item
               key={token}
@@ -172,7 +172,7 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
         <h3 className="facet-heading" id="facet-state">
           State
         </h3>
-        <ActionList selectionVariant="multiple" aria-labelledby="facet-state">
+        <ActionList role="listbox" selectionVariant="multiple" aria-labelledby="facet-state">
           {STATE_FACETS.map(([token, label]) => (
             <ActionList.Item
               key={token}
@@ -194,7 +194,7 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
         <h3 className="facet-heading" id="facet-role">
           Role
         </h3>
-        <ActionList selectionVariant="multiple" aria-labelledby="facet-role">
+        <ActionList role="listbox" selectionVariant="multiple" aria-labelledby="facet-role">
           {(Object.keys(ROLE_LABELS) as (keyof typeof ROLE_LABELS)[]).map((role) => {
             const token = `role:${role}`;
             return (
@@ -213,7 +213,7 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
         <h3 className="facet-heading" id="facet-activity">
           Activity
         </h3>
-        <ActionList selectionVariant="single" aria-labelledby="facet-activity">
+        <ActionList role="listbox" selectionVariant="single" aria-labelledby="facet-activity">
           {ACTIVITY_FACETS.map(([value, label]) => (
             <ActionList.Item
               key={value}
@@ -246,7 +246,7 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
             className="facet-filter"
           />
         )}
-        <ActionList selectionVariant="multiple" aria-label="Repository">
+        <ActionList role="listbox" selectionVariant="multiple" aria-label="Repository">
           {visibleRepos.map(({ repo, count }) => {
             const token = `repo:${repo}`;
             return (
@@ -275,7 +275,7 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
       {labels.length > 0 && (
         <div className="facet">
           <h3 className="facet-heading">Labels</h3>
-          <ActionList selectionVariant="multiple" aria-label="Labels">
+          <ActionList role="listbox" selectionVariant="multiple" aria-label="Labels">
             {visibleLabels.map(([label, count]) => {
               const token = `label:${label}`;
               return (
