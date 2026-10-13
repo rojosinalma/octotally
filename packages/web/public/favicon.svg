@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-labelledby="t">
+  <title id="t">Octotally</title>
+  <!-- Octotally mark: a tally of three strokes crossed by a fourth, inside a rounded tile. -->
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#1f883d"/>
+  <g stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M9 8v16"/>
+    <path d="M16 8v16"/>
+    <path d="M23 8v16"/>
+    <path d="M6 22L26 10"/>
+  </g>
+</svg>

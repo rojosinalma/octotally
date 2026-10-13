@@ -1,0 +1,15 @@
+# Development / self-hosted build of this checkout. Other users: see docker-compose.example.yml.
+services:
+  octotally:
+    build: .
+    container_name: octotally
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    networks:
+      - traefik-proxy
+
+networks:
+  traefik-proxy:
+    external: true

@@ -1,0 +1,44 @@
+{
+  "assignee": {
+    "data": {
+      "search": {
+        "pageInfo": { "hasNextPage": false, "endCursor": null },
+        "nodes": [{ "id": "I_kwDOAbCdEf5xyz002" }]
+      },
+      "rateLimit": { "cost": 1, "remaining": 4996, "limit": 5000, "resetAt": "2026-10-13T13:00:00Z" }
+    }
+  },
+  "mentions": {
+    "data": {
+      "search": {
+        "pageInfo": { "hasNextPage": false, "endCursor": null },
+        "nodes": [{ "id": "PR_kwDOAbCdEf5abc001" }]
+      },
+      "rateLimit": { "cost": 1, "remaining": 4995, "limit": 5000, "resetAt": "2026-10-13T13:00:00Z" }
+    }
+  },
+  "commenter": {
+    "data": {
+      "search": {
+        "pageInfo": { "hasNextPage": false, "endCursor": null },
+        "nodes": [{ "id": "I_kwDOAbCdEf5xyz001" }, { "id": "D_kwDOAbCdEf4def001" }]
+      },
+      "rateLimit": { "cost": 1, "remaining": 4994, "limit": 5000, "resetAt": "2026-10-13T13:00:00Z" }
+    }
+  },
+  "review-requested": {
+    "data": {
+      "search": { "pageInfo": { "hasNextPage": false, "endCursor": null }, "nodes": [] },
+      "rateLimit": { "cost": 1, "remaining": 4993, "limit": 5000, "resetAt": "2026-10-13T13:00:00Z" }
+    }
+  },
+  "reviewed-by": {
+    "data": {
+      "search": {
+        "pageInfo": { "hasNextPage": false, "endCursor": null },
+        "nodes": [{ "id": "PR_kwDOAbCdEf5abc001" }]
+      },
+      "rateLimit": { "cost": 1, "remaining": 4992, "limit": 5000, "resetAt": "2026-10-13T13:00:00Z" }
+    }
+  }
+}

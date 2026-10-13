@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Full verification: typecheck, lint, tests, build, then a container smoke test against /health.
+# Usage: bin/verify            (SKIP_DOCKER=1 bin/verify skips the container part)
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+IMAGE="${VERIFY_IMAGE:-octotally:verify}"
+HEALTH_TIMEOUT="${VERIFY_HEALTH_TIMEOUT:-30}"
+container=""
+
+fail() {
+  echo "verify: FAIL $1" >&2
+  exit 1
+}
+
+cleanup() {
+  if [[ -n "$container" ]]; then
+    docker rm -f "$container" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+step() {
+  local name=$1
+  shift
+  echo "verify: $name"
+  "$@" || fail "$name"
+}
+
+step install bun install --frozen-lockfile
+step typecheck bun run typecheck
+step lint bun run lint
+step test bun test
+step build bun run build
+
+if [[ "${SKIP_DOCKER:-0}" == "1" ]]; then
+  echo "verify: docker skipped (SKIP_DOCKER=1)"
+  echo "verify: OK"
+  exit 0
+fi
+
+command -v docker >/dev/null 2>&1 || fail "docker (not installed; set SKIP_DOCKER=1 to skip)"
+
+step docker-build docker build -t "$IMAGE" .
+
+echo "verify: docker-run"
+container=$(docker run --rm -d -p 127.0.0.1:0:3000 -e DATA_DIR=/data "$IMAGE") || fail docker-run
+
+port=$(docker port "$container" 3000/tcp | head -n1 | sed 's/.*://') || fail docker-port
+[[ -n "$port" ]] || fail docker-port
+
+echo "verify: health (http://127.0.0.1:${port}/health, up to ${HEALTH_TIMEOUT}s)"
+ok=0
+for ((i = 0; i < HEALTH_TIMEOUT; i++)); do
+  if curl -fsS -o /dev/null "http://127.0.0.1:${port}/health"; then
+    ok=1
+    break
+  fi
+  if ! docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$ok" != "1" ]]; then
+  echo "verify: container logs:" >&2
+  docker logs "$container" >&2 2>&1 || true
+  fail health
+fi
+
+curl -fsS "http://127.0.0.1:${port}/health"
+echo
+echo "verify: OK"

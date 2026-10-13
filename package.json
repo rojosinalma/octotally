@@ -5,7 +5,9 @@
   "license": "AGPL-3.0-only",
   "description": "GitHub involvement tracker: every issue, PR and discussion you are part of, filtered to what still needs you.",
   "repository": "github:rojosinalma/octotally",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run --filter '*' dev",
     "build": "bun run --filter @octotally/shared build && bun run --filter @octotally/web build && bun run --filter @octotally/server build",
@@ -20,5 +22,7 @@
     "@biomejs/biome": "2.5.15",
     "typescript": "5.9.3"
   },
-  "engines": { "bun": ">=1.3" }
+  "engines": {
+    "bun": ">=1.3"
+  }
 }

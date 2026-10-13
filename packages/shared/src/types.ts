@@ -111,7 +111,18 @@ export const Settings = z.object({
   defaultView: z.string().default('active'),
 });
 export type Settings = z.infer<typeof Settings>;
-export const SettingsPatch = Settings.partial();
+/**
+ * Partial update. Built from the shape with defaults removed: zod 4's `.partial()` would still
+ * fill every absent key with its default, turning a one-key PUT into a reset of everything else.
+ */
+export const SettingsPatch = z.object(
+  Object.fromEntries(
+    Object.entries(Settings.shape).map(([key, schema]) => [
+      key,
+      (schema as z.ZodDefault<z.ZodTypeAny>).removeDefault().optional(),
+    ]),
+  ) as { [K in keyof Settings]: z.ZodOptional<z.ZodType<Settings[K]>> },
+);
 export type SettingsPatch = z.infer<typeof SettingsPatch>;
 export const DEFAULT_SETTINGS: Settings = Settings.parse({});
 
@@ -129,7 +140,13 @@ export const View = z.object({
 export type View = z.infer<typeof View>;
 
 export const BUILTIN_VIEWS: View[] = [
-  { id: 'active', name: 'Active', query: 'updated:>{activeWindowDays}d hidden:none', builtin: true, position: 0 },
+  {
+    id: 'active',
+    name: 'Active',
+    query: 'updated:>{activeWindowDays}d hidden:none',
+    builtin: true,
+    position: 0,
+  },
   {
     id: 'needs-pr',
     name: 'Needs PR',
@@ -138,7 +155,7 @@ export const BUILTIN_VIEWS: View[] = [
     position: 1,
   },
   { id: 'all', name: 'All', query: 'hidden:none', builtin: true, position: 2 },
-  { id: 'hidden', name: 'Hidden', query: 'hidden:any', builtin: true, position: 3 },
+  { id: 'hidden', name: 'Hidden', query: 'hidden:hidden', builtin: true, position: 3 },
 ];
 
 // ---------------------------------------------------------------------------

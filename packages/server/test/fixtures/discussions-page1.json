@@ -1,0 +1,35 @@
+{
+  "data": {
+    "search": {
+      "discussionCount": 1,
+      "pageInfo": { "hasNextPage": false, "endCursor": null },
+      "nodes": [
+        {
+          "__typename": "Discussion",
+          "id": "D_kwDOAbCdEf4def001",
+          "number": 12,
+          "title": "How do I calibrate the thing?",
+          "url": "https://github.com/acme/widgets/discussions/12",
+          "repository": { "nameWithOwner": "acme/widgets", "owner": { "login": "acme" } },
+          "closed": false,
+          "isAnswered": false,
+          "author": { "login": "newbie" },
+          "labels": { "nodes": [{ "name": "question" }] },
+          "comments": {
+            "totalCount": 3,
+            "nodes": [
+              {
+                "author": { "login": "octocat" },
+                "createdAt": "2026-10-11T18:00:00Z",
+                "url": "https://github.com/acme/widgets/discussions/12#discussioncomment-3"
+              }
+            ]
+          },
+          "createdAt": "2026-10-05T10:00:00Z",
+          "updatedAt": "2026-10-11T18:00:00Z"
+        }
+      ]
+    },
+    "rateLimit": { "cost": 1, "remaining": 4997, "limit": 5000, "resetAt": "2026-10-13T13:00:00Z" }
+  }
+}
