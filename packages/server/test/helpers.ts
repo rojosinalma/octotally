@@ -74,7 +74,9 @@ export function fakeGitHub(overrides: Record<string, unknown> = {}, calls: FakeC
       case 'InvolvedDiscussions':
         return json(discussionsPage);
       case 'RoleIds': {
-        const qualifier = String(body.variables.q).split(':')[0] as keyof typeof roleIds;
+        // `is:issue`/`is:pr` prefix is stripped: fixtures are keyed by the role qualifier only.
+        const q = String(body.variables.q).replace(/^is:(issue|pr)\s+/, '');
+        const qualifier = q.split(':')[0] as keyof typeof roleIds;
         const key = `RoleIds:${qualifier}:${body.variables.type}`;
         if (key in overrides) return json(overrides[key]);
         return json(roleIds[qualifier] ?? roleIds['review-requested']);
