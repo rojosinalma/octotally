@@ -140,21 +140,21 @@ export const View = z.object({
 export type View = z.infer<typeof View>;
 
 export const BUILTIN_VIEWS: View[] = [
+  { id: 'all', name: 'All', query: 'hidden:none', builtin: true, position: 0 },
   {
     id: 'active',
     name: 'Active',
     query: 'updated:>{activeWindowDays}d hidden:none',
     builtin: true,
-    position: 0,
+    position: 1,
   },
   {
     id: 'needs-pr',
     name: 'Needs PR',
     query: 'is:open -is:pr -linked:pr hidden:none',
     builtin: true,
-    position: 1,
+    position: 2,
   },
-  { id: 'all', name: 'All', query: 'hidden:none', builtin: true, position: 2 },
   { id: 'hidden', name: 'Hidden', query: 'hidden:hidden', builtin: true, position: 3 },
 ];
 

@@ -19,9 +19,9 @@ interface Props {
 }
 
 const TYPE_FACETS = [
+  ['is:discussion', 'Discussions'],
   ['is:issue', 'Issues'],
   ['is:pr', 'Pull requests'],
-  ['is:discussion', 'Discussions'],
 ] as const;
 const STATE_FACETS = [
   ['is:open', 'Open'],

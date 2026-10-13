@@ -147,7 +147,7 @@ describe('matchesItem', () => {
 
 describe('views and settings substitution', () => {
   test('built-in Active view substitutes the window', () => {
-    const q = substituteSettings((BUILTIN_VIEWS[0] as View).query, {
+    const q = substituteSettings((BUILTIN_VIEWS.find((v) => v.id === 'active') as View).query, {
       ...DEFAULT_SETTINGS,
       activeWindowDays: 7,
     });
