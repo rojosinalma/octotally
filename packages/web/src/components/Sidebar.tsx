@@ -1,4 +1,4 @@
-import type { Item, View } from '@octotally/shared';
+import { type Item, substituteSettings, type View } from '@octotally/shared';
 import { PencilIcon, PlusIcon } from '@primer/octicons-react';
 import { ActionList, Button, CounterLabel, Dialog, FormControl, NavList, TextInput } from '@primer/react';
 import { type MouseEvent, useMemo, useState } from 'react';
@@ -38,8 +38,10 @@ const REPO_LIMIT = 8;
 const LABEL_LIMIT = 10;
 
 export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items }: Props) {
-  const { views, reloadViews } = useApp();
+  const { views, reloadViews, settings } = useApp();
   const { toast } = useToast();
+  // Views store `{setting}` placeholders; the search bar only ever shows the resolved query.
+  const resolve = (view: View) => substituteSettings(view.query, settings);
   const [repoFilter, setRepoFilter] = useState('');
   const [showAllRepos, setShowAllRepos] = useState(false);
   const [showAllLabels, setShowAllLabels] = useState(false);
@@ -108,11 +110,11 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
   const viewItem = (view: View) => (
     <NavList.Item
       key={view.id}
-      href={`/?q=${encodeURIComponent(view.query)}`}
+      href={`/?q=${encodeURIComponent(resolve(view))}`}
       aria-current={activeViewId === view.id ? 'page' : undefined}
       onClick={(e: MouseEvent) => {
         e.preventDefault();
-        onQuery(view.query);
+        onQuery(resolve(view));
       }}
     >
       {view.name}
