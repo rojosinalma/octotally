@@ -17,6 +17,9 @@ import '@primer/primitives/dist/css/functional/themes/dark-dimmed.css';
 import '@primer/primitives/dist/css/functional/themes/dark-colorblind.css';
 import '@primer/primitives/dist/css/functional/themes/dark-tritanopia.css';
 import '@primer/primitives/dist/css/functional/themes/dark-high-contrast.css';
+// Extra themes: generated from Primer's dark tokens with the same selector scheme, so they plug in
+// exactly like the stock ones (see src/themes/README.md).
+import './themes/dark_dracula.css';
 
 import { Theme } from '@octotally/shared';
 import { BaseStyles } from '@primer/react';
@@ -36,6 +39,7 @@ export const THEME_LABELS: Record<Theme, string> = {
   dark_colorblind: 'Dark colorblind',
   dark_tritanopia: 'Dark tritanopia',
   dark_high_contrast: 'Dark high contrast',
+  dark_dracula: 'Dracula',
 };
 
 export const THEMES: Theme[] = Theme.options;

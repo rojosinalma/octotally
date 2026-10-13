@@ -88,6 +88,8 @@ export const Theme = z.enum([
   'dark_colorblind',
   'dark_tritanopia',
   'dark_high_contrast',
+  /** Community theme generated from Primer's dark tokens (packages/web/src/themes); dark themes must contain "dark" in the name for Primer React.. */
+  'dark_dracula',
 ]);
 export type Theme = z.infer<typeof Theme>;
 

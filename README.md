@@ -32,7 +32,7 @@ decide it is done.
 - Item panel with the latest activity, labels, assignees and linked PRs
 - Discord digest: daily at a chosen hour and/or near-real-time pings
 - Keyboard first: `j`/`k` move, `e` done, `m` mute, `o` open on GitHub, `/` search, `?` help
-- All nine GitHub Primer themes, following the OS by default
+- All nine GitHub Primer themes plus a Dracula theme, following the OS by default
 - JSON API for scripts and agents, `/health` for monitors
 - Rate-limit aware poller with backoff; cached data is served while GitHub is down
 
@@ -100,7 +100,7 @@ without a restart.
 | `timezone` | `UTC` | IANA timezone for `digestHour` |
 | `digestRealtime` | false | Send a ping right after a poll that found new activity |
 | `discordWebhookUrl` | – | Discord webhook (`https://` only) |
-| `theme` | `auto` | One of the nine Primer themes, or `auto` to follow the OS |
+| `theme` | `auto` | One of the nine Primer themes, `dark_dracula`, or `auto` to follow the OS |
 | `defaultView` | `active` | View shown on load |
 
 ## Search syntax
@@ -211,8 +211,10 @@ Changes to these routes are additive; a breaking change bumps the major version.
 ## Themes
 
 All nine Primer themes: light, light colorblind, light tritanopia, light high contrast, dark, dark
-dimmed, dark colorblind, dark tritanopia, dark high contrast — plus `auto`, which follows the OS.
-Pick one in Settings.
+dimmed, dark colorblind, dark tritanopia, dark high contrast — plus **Dracula** (`dark_dracula`, generated
+from Primer's dark tokens, see `packages/web/src/themes/README.md`) and `auto`, which follows the OS.
+Pick one in Settings. Adding a theme is one CSS file using Primer's token names; dark themes must have
+`dark` in their name because Primer React derives the colour mode from it.
 
 ## Health
 
