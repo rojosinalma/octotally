@@ -169,7 +169,7 @@ describe('api routes', () => {
     expect((await req('/api/views', { method: 'POST', json: { name: '' } })).body.kind).toBe('validation');
     const ren = await req('/api/views/active', { method: 'PUT', json: { name: 'Hot', position: 9 } });
     expect(ren.body).toMatchObject({
-      view: { name: 'Hot', position: 9, query: must(BUILTIN_VIEWS[0]).query },
+      view: { name: 'Hot', position: 9, query: must(BUILTIN_VIEWS.find((v) => v.id === 'active')).query },
     });
     expect((await req('/api/views/active', { method: 'PUT', json: { query: 'is:pr' } })).status).toBe(400);
     expect((await req('/api/views/active', { method: 'DELETE' })).status).toBe(400);
