@@ -1,7 +1,7 @@
-# Development / self-hosted build of this checkout. Other users: see docker-compose.example.yml.
+# Homelab instance: pinned GHCR release. Other users: see docker-compose.example.yml.
 services:
   octotally:
-    build: .
+    image: ghcr.io/rojosinalma/octotally:v0.1.0
     container_name: octotally
     restart: unless-stopped
     env_file: .env
