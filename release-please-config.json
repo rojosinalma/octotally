@@ -10,9 +10,11 @@
     { "type": "perf", "section": "Performance" },
     { "type": "refactor", "section": "Refactoring" },
     { "type": "docs", "section": "Documentation" },
-    { "type": "chore", "section": "Maintenance" }
+    { "type": "chore", "section": "Maintenance", "hidden": true }
   ],
   "packages": {
-    ".": {}
+    ".": {
+      "extra-files": [{ "type": "generic", "path": "compose.yaml" }]
+    }
   }
 }
