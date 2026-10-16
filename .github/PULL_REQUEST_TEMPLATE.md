@@ -11,5 +11,5 @@
 
 - [ ] `bin/verify` passes locally (typecheck, lint, tests, build, container smoke)
 - [ ] Tests added or updated for grammar, relevance or digest changes
-- [ ] README / docs updated when a setting, qualifier, env var or API route changed
+- [ ] `docs/` updated when a setting, qualifier, env var or API route changed (see CONTRIBUTING.md → Documentation)
 - [ ] No GitHub write operations introduced

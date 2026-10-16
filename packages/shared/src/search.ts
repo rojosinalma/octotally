@@ -268,7 +268,7 @@ export function parseSearch(query: string, opts: ParseOptions = {}): ParsedSearc
       case 'commenter':
       case 'reviewer':
       case 'involves':
-        // Single-user instance: these always mean the user; map to role filters.
+        // These qualifiers always refer to the token's own account; map them to role filters.
         if (key === 'involves') break;
         add(p.roles, p.notRoles, ROLE_ALIASES[key] as Role);
         break;

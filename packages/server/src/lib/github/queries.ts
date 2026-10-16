@@ -40,7 +40,7 @@ const DISCUSSION_FIELDS = `
   createdAt updatedAt
 `;
 
-/** Issues + PRs the user is involved in, newest activity first. */
+/** Issues + PRs the viewer is involved in, newest activity first. */
 export const INVOLVED_ISSUES_QUERY = `
 query InvolvedIssues($q: String!, $first: Int!, $after: String) {
   search(type: ISSUE_ADVANCED, query: $q, first: $first, after: $after) {
@@ -65,7 +65,7 @@ query InvolvedDiscussions($q: String!, $first: Int!, $after: String) {
   ${RATE}
 }`;
 
-/** Ids only: used once per role qualifier to derive the user's roles on each item. */
+/** Ids only: used once per role qualifier to derive the viewer's roles on each item. */
 export const ROLE_IDS_QUERY = `
 query RoleIds($q: String!, $first: Int!, $after: String, $type: SearchType!) {
   search(type: $type, query: $q, first: $first, after: $after) {
