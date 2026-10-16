@@ -8,37 +8,37 @@ All notable changes to Octotally are documented here. The file is maintained by
 
 ### Bug fixes
 
-* **ci:** keep biome off release-please's manifest ([19145a7](https://github.com/rojosinalma/octotally/commit/19145a7c3262b5f41527fa4da2599586cb71b506))
-* **ci:** tag the GHCR image with the release version; allow rebuilding an existing tag by hand ([8d6f0ec](https://github.com/rojosinalma/octotally/commit/8d6f0ec2de8a7a611a9a0b9034139cb39127d136))
+* **ci:** keep biome off release-please's manifest ([13acb8b](https://github.com/rojosinalma/octotally/commit/13acb8b6a1fc998a5c027f15f0099f9a7c7ee2bf))
+* **ci:** tag the GHCR image with the release version; allow rebuilding an existing tag by hand ([655cfdd](https://github.com/rojosinalma/octotally/commit/655cfdd92b7d194aa64875a55b49a7d5dc5e005c))
 
 
 ### Documentation
 
-* split the README into docs/ topic files and a design document ([07af67a](https://github.com/rojosinalma/octotally/commit/07af67a331fa58fd0ea6c660327f1049af599b46))
+* split the README into docs/ topic files and a design document ([cb64bae](https://github.com/rojosinalma/octotally/commit/cb64bae21b5c71c40ad60a0cb8007cfc03d906b7))
 
 ## 0.1.0 (2026-10-15)
 
 
 ### Features
 
-* server, Primer web UI, repo files and CI ([1f19993](https://github.com/rojosinalma/octotally/commit/1f19993913fb3f4b1e0bf67cb6368f22385e470b))
-* **web:** All view first, Discussions first in the type facet ([6305f48](https://github.com/rojosinalma/octotally/commit/6305f4873e29a3a8ebe9f5e8a622a69989555a69))
-* **web:** Dracula theme generated from Primer's dark tokens ([c06d8e2](https://github.com/rojosinalma/octotally/commit/c06d8e27e8077c14658eb96c1c426a2f5aa5ef41))
-* **web:** footer linking to the repository, issues, discussions and licence ([5dad82b](https://github.com/rojosinalma/octotally/commit/5dad82b44f858613eacf75feebe7013a991595e8))
+* server, Primer web UI, repo files and CI ([293caeb](https://github.com/rojosinalma/octotally/commit/293caeb1f45a04836961861a17835608ab6267de))
+* **web:** All view first, Discussions first in the type facet ([5bfa1e4](https://github.com/rojosinalma/octotally/commit/5bfa1e423dff5e8e49a9213d0db9e69037d86c45))
+* **web:** Dracula theme generated from Primer's dark tokens ([01753f9](https://github.com/rojosinalma/octotally/commit/01753f9303105a780865a59715f2aa91f310f269))
+* **web:** footer linking to the repository, issues, discussions and licence ([3956d62](https://github.com/rojosinalma/octotally/commit/3956d62455a2eed32d5d0e0e957216bdec605ece))
 
 
 ### Bug fixes
 
-* **github:** type every issue/PR search so fine-grained PATs return results ([91eb637](https://github.com/rojosinalma/octotally/commit/91eb6377ffff9088860953b7f1322d0a39fca772))
-* **server:** API_TOKEN is an extra credential, AUTH_PASSWORD is the only UI gate ([5b601b9](https://github.com/rojosinalma/octotally/commit/5b601b9c855463caf49ea5a7d4fa00507ba74d74))
-* **test:** look up the builtin 'active' view by id, not by position ([a568581](https://github.com/rojosinalma/octotally/commit/a568581844a3bde5d644403ac5f9c1968f65c4a0))
-* **web:** facet checkboxes reflect selection; sticky header and independently scrolling sidebar; themed scrollbars ([571ce12](https://github.com/rojosinalma/octotally/commit/571ce123729a0ec05251880414223f3b18d10a60))
-* **web:** resolve view placeholders before putting a view query in the search bar ([2e0cf39](https://github.com/rojosinalma/octotally/commit/2e0cf3978ac78572c7f4549fddf69aaeeb5a031e))
+* **github:** type every issue/PR search so fine-grained PATs return results ([7214adb](https://github.com/rojosinalma/octotally/commit/7214adbd1e02628468865f523fba6a3bf7f98398))
+* **server:** API_TOKEN is an extra credential, AUTH_PASSWORD is the only UI gate ([6980ff6](https://github.com/rojosinalma/octotally/commit/6980ff6a58356d764e814398366278f27b632a8a))
+* **test:** look up the builtin 'active' view by id, not by position ([346b7cd](https://github.com/rojosinalma/octotally/commit/346b7cd158d6e808eb59035fd5e40eee1ff93fa4))
+* **web:** facet checkboxes reflect selection; sticky header and independently scrolling sidebar; themed scrollbars ([8357739](https://github.com/rojosinalma/octotally/commit/8357739d66e409d55dbe473c93c65fce4fd828f8))
+* **web:** resolve view placeholders before putting a view query in the search bar ([beb38af](https://github.com/rojosinalma/octotally/commit/beb38afb5d0388586f951719cc4be5d76e685718))
 
 
 ### Maintenance
 
-* **ci:** bump the github-actions group across 1 directory with 7 updates ([#3](https://github.com/rojosinalma/octotally/issues/3)) ([6c0861f](https://github.com/rojosinalma/octotally/commit/6c0861f4d89fe3f713041ea101d7a11aa1487b6a))
-* **deps:** bump typescript ([#4](https://github.com/rojosinalma/octotally/issues/4)) ([35f94b2](https://github.com/rojosinalma/octotally/commit/35f94b203b5565918f41f77cfa1c690f0747ff05))
-* prepare first release ([eafbd1e](https://github.com/rojosinalma/octotally/commit/eafbd1ecff7d5633f05e614ba662d61cc176c32a))
-* scaffold monorepo with shared contract and search grammar ([7c48ab1](https://github.com/rojosinalma/octotally/commit/7c48ab1a15deaec981b9a7d52d31b9c5d5398697))
+* **ci:** bump the github-actions group across 1 directory with 7 updates ([#3](https://github.com/rojosinalma/octotally/issues/3)) ([88482fd](https://github.com/rojosinalma/octotally/commit/88482fd6df8afd2764645353b5cc83f14a885f01))
+* **deps:** bump typescript ([#4](https://github.com/rojosinalma/octotally/issues/4)) ([03e4b5a](https://github.com/rojosinalma/octotally/commit/03e4b5ab4c6eb008036093321fa0daa1f13a75bb))
+* prepare first release ([2b9e5ef](https://github.com/rojosinalma/octotally/commit/2b9e5ef1746c49e27cb9c62788fb68ba6f2ee906))
+* scaffold monorepo with shared contract and search grammar ([b7b1b60](https://github.com/rojosinalma/octotally/commit/b7b1b6072efe97dfcad713f743f649e065139b12))
