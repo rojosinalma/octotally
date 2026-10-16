@@ -11,7 +11,7 @@ export type ItemType = z.infer<typeof ItemType>;
 export const ItemState = z.enum(['open', 'closed', 'merged']);
 export type ItemState = z.infer<typeof ItemState>;
 
-/** How the user is involved in an item (GitHub `involves:` = union of these). */
+/** How the token's account is involved in an item (GitHub `involves:` = union of these). */
 export const Role = z.enum(['author', 'assigned', 'mentioned', 'commenter', 'reviewer']);
 export type Role = z.infer<typeof Role>;
 
