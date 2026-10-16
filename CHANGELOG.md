@@ -3,6 +3,19 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.1.1](https://github.com/rojosinalma/octotally/compare/v0.1.0...v0.1.1) (2026-10-16)
+
+
+### Bug fixes
+
+* **ci:** keep biome off release-please's manifest ([19145a7](https://github.com/rojosinalma/octotally/commit/19145a7c3262b5f41527fa4da2599586cb71b506))
+* **ci:** tag the GHCR image with the release version; allow rebuilding an existing tag by hand ([8d6f0ec](https://github.com/rojosinalma/octotally/commit/8d6f0ec2de8a7a611a9a0b9034139cb39127d136))
+
+
+### Documentation
+
+* split the README into docs/ topic files and a design document ([07af67a](https://github.com/rojosinalma/octotally/commit/07af67a331fa58fd0ea6c660327f1049af599b46))
+
 ## 0.1.0 (2026-10-15)
 
 

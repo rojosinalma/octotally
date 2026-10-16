@@ -5,7 +5,7 @@
 services:
   octotally:
     # Pinned to the current release; release PRs bump it. Use `:latest` to follow every release.
-    image: ghcr.io/rojosinalma/octotally:v0.1.0 # x-release-please-version
+    image: ghcr.io/rojosinalma/octotally:v0.1.1 # x-release-please-version
     container_name: octotally
     restart: unless-stopped
     env_file: .env
