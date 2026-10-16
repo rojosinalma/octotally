@@ -1,6 +1,6 @@
 {
   "name": "octotally",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "license": "AGPL-3.0-only",
   "description": "GitHub involvement tracker: every issue, PR and discussion you are part of, filtered to what still needs you.",
