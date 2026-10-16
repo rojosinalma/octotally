@@ -3,6 +3,14 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.1.2](https://github.com/rojosinalma/octotally/compare/v0.1.1...v0.1.2) (2026-10-16)
+
+
+### Documentation
+
+* **changelog:** point commit links at the re-signed history ([fc91474](https://github.com/rojosinalma/octotally/commit/fc91474fe0c592e4fbf269a4d2b95248d42dd2b0))
+* README to the standard shape with badges, usage and development sections; add the code of conduct ([8ecf948](https://github.com/rojosinalma/octotally/commit/8ecf948c3adbc460939e4e7122f5d184f8c86112))
+
 ## [0.1.1](https://github.com/rojosinalma/octotally/compare/v0.1.0...v0.1.1) (2026-10-16)
 
 
