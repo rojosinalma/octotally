@@ -1,21 +1,24 @@
-# Homelab instance: pinned GHCR release. Other users: see docker-compose.example.yml.
+# Octotally — run it with:
+#   cp .env.example .env     # paste GITHUB_TOKEN; set AUTH_PASSWORD unless a reverse proxy does auth
+#   docker compose up -d
+# Then open http://localhost:3000. Configuration: docs/configuration.md.
 services:
   octotally:
-    image: ghcr.io/rojosinalma/octotally:v0.1.0
+    # Pinned to the current release; release PRs bump it. Use `:latest` to follow every release.
+    image: ghcr.io/rojosinalma/octotally:v0.1.0 # x-release-please-version
     container_name: octotally
     restart: unless-stopped
     env_file: .env
+    ports:
+      # Host side of the mapping. OCTOTALLY_BIND / OCTOTALLY_PORT may be set in .env
+      # (e.g. 127.0.0.1 and 8080); the server inside the container always listens on 3000.
+      - "${OCTOTALLY_BIND:-0.0.0.0}:${OCTOTALLY_PORT:-3000}:3000"
     volumes:
+      # SQLite database and the generated session secret; keep it on local disk, not on NFS.
       - ./data:/data
-    networks:
-      - ingress
     healthcheck:
       test: ["CMD-SHELL", "bun -e \"fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
-
-networks:
-  ingress:
-    external: true

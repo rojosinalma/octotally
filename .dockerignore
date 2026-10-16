@@ -1,6 +1,5 @@
 .git
 .github
-.openchamber
 node_modules
 **/node_modules
 **/dist
@@ -15,7 +14,6 @@ coverage
 *.db
 *.db-*
 compose*.yaml
-docker-compose*.yml
 Dockerfile
 .dockerignore
 bin
