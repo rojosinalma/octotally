@@ -1,5 +1,8 @@
 # Changelog
 
+All notable changes to Octotally are documented here. The file is maintained by
+[release-please](https://github.com/googleapis/release-please) from conventional commit messages.
+
 ## 0.1.0 (2026-10-15)
 
 
@@ -26,8 +29,3 @@
 * **deps:** bump typescript ([#4](https://github.com/rojosinalma/octotally/issues/4)) ([35f94b2](https://github.com/rojosinalma/octotally/commit/35f94b203b5565918f41f77cfa1c690f0747ff05))
 * prepare first release ([eafbd1e](https://github.com/rojosinalma/octotally/commit/eafbd1ecff7d5633f05e614ba662d61cc176c32a))
 * scaffold monorepo with shared contract and search grammar ([7c48ab1](https://github.com/rojosinalma/octotally/commit/7c48ab1a15deaec981b9a7d52d31b9c5d5398697))
-
-## Changelog
-
-All notable changes to Octotally are documented here. The file is maintained by
-[release-please](https://github.com/googleapis/release-please) from conventional commit messages.
