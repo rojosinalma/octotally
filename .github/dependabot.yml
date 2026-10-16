@@ -9,6 +9,7 @@ updates:
     groups:
       bun-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
     commit-message:
       prefix: "chore(deps)"
 
@@ -20,6 +21,7 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
     commit-message:
       prefix: "chore(ci)"
 
