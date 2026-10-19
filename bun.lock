@@ -41,9 +41,9 @@
         "@octotally/shared": "workspace:*",
         "@primer/octicons-react": "19.40.0",
         "@primer/primitives": "11.10.0",
-        "@primer/react": "38.40.1",
-        "react": "19.3.0",
-        "react-dom": "19.3.0",
+        "@primer/react": "38.42.0",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
         "zod": "4.6.7",
       },
       "devDependencies": {
@@ -163,7 +163,7 @@
 
     "@primer/primitives": ["@primer/primitives@11.10.0", "", {}, "sha512-ihZxIst4Izry284StKFjpbYvX6R/IBFTLu+qiuAmR93PsKF2hdjoabhSYwKI8iCxOUx94jVP55bI3NoY7STjYQ=="],
 
-    "@primer/react": ["@primer/react@38.40.1", "", { "dependencies": { "@github/mini-throttle": "^2.1.1", "@github/relative-time-element": "^5.0.0", "@lit-labs/react": "1.2.1", "@oddbird/popover-polyfill": "^0.5.2", "@primer/behaviors": "^1.10.3", "@primer/live-region-element": "^0.8.0", "@primer/octicons-react": "^19.28.1", "@primer/primitives": "10.x || 11.x", "@tanstack/react-virtual": "^3.13.18", "clsx": "^2.1.1", "color2k": "^2.0.3", "deepmerge": "^4.3.1", "focus-visible": "^5.2.1", "history": "^5.0.0", "hsluv": "1.0.1", "lodash.isempty": "^4.4.0", "lodash.isobject": "^3.0.2", "react-intersection-observer": "^10.0.3" }, "peerDependencies": { "@types/react": "18.x || 19.x", "@types/react-dom": "18.x || 19.x", "@types/react-is": "18.x || 19.x", "react": "18.x || 19.x", "react-dom": "18.x || 19.x", "react-is": "18.x || 19.x" }, "optionalPeers": ["@types/react", "@types/react-dom", "@types/react-is"] }, "sha512-yTd+QTtWXdqJbWQLCnLibwh280j2TKw1+tREEXtJR6lRYiqrE1dnu5ifCsKhsqIYvxqaKZBNWg4KRqiFG6opZA=="],
+    "@primer/react": ["@primer/react@38.42.0", "", { "dependencies": { "@github/mini-throttle": "^2.1.1", "@github/relative-time-element": "^5.0.0", "@lit-labs/react": "1.2.1", "@oddbird/popover-polyfill": "^0.5.2", "@primer/behaviors": "^1.10.3", "@primer/live-region-element": "^0.8.1", "@primer/octicons-react": "^19.28.1", "@primer/primitives": "10.x || 11.x", "@tanstack/react-virtual": "^3.13.18", "clsx": "^2.1.1", "color2k": "^2.0.3", "deepmerge": "^4.3.1", "focus-visible": "^5.2.1", "history": "^5.0.0", "hsluv": "1.0.1", "lodash.isempty": "^4.4.0", "lodash.isobject": "^3.0.2", "react-intersection-observer": "^10.0.3" }, "peerDependencies": { "@types/react": "18.x || 19.x", "@types/react-dom": "18.x || 19.x", "@types/react-is": "18.x || 19.x", "react": "18.x || 19.x", "react-dom": "18.x || 19.x", "react-is": "18.x || 19.x" }, "optionalPeers": ["@types/react", "@types/react-dom", "@types/react-is"] }, "sha512-hPcc/QGjHrAPBsAXGUkhgCJB91pYiWdxCMwoWNBDZk8MC9P6W3YzrFyPNy7a2YTT/bUwpHbyVbK5eitAjuGVAA=="],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.13", "", { "os": "android", "cpu": "arm" }, "sha512-Vu/NICrgdRvUOeaJZIyB2FP63s6fO/4ud5l8dXmxDx9yDyn+mN0y+gsvsVviSli+T361Aqo0h46EuMoobrwawA=="],
 
@@ -333,9 +333,9 @@
 
     "quick-format-unescaped": ["quick-format-unescaped@4.0.4", "", {}, "sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg=="],
 
-    "react": ["react@19.3.0", "", {}, "sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog=="],
+    "react": ["react@19.3.1", "", {}, "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw=="],
 
-    "react-dom": ["react-dom@19.3.0", "", { "dependencies": { "scheduler": "^0.28.0" }, "peerDependencies": { "react": "^19.3.0" } }, "sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q=="],
+    "react-dom": ["react-dom@19.3.1", "", { "dependencies": { "scheduler": "^0.28.0" }, "peerDependencies": { "react": "^19.3.1" } }, "sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ=="],
 
     "react-intersection-observer": ["react-intersection-observer@10.1.0", "", { "peerDependencies": { "react": "^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["react-dom"] }, "sha512-V8HDu3+Llg6OEhOxx8LnUSS0t4VS+1Xk9ZatkI8Jct/H0CwKnqFTCu8NT3q7ghJTghTdIrEMPSWr2dkKPG+gdQ=="],
 
