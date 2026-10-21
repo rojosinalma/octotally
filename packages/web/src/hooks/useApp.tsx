@@ -1,4 +1,4 @@
-import type { Settings, SettingsPatch, SyncStatus, View } from '@octotally/shared';
+import type { Settings, SettingsPatch, SiblingsView, SyncStatus, View } from '@octotally/shared';
 import { BUILTIN_VIEWS, DEFAULT_SETTINGS } from '@octotally/shared';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { type ApiError, api } from '../api';
@@ -18,12 +18,15 @@ export interface AppState {
   reloadViews: () => Promise<void>;
   authRequired: boolean;
   logout: () => Promise<void>;
+  /** Octoforge sibling list for the member switcher; null when this is no Octoforge member. */
+  siblings: SiblingsView | null;
 }
 
 const AppContext = createContext<AppState | null>(null);
 
 const STATUS_POLL_IDLE_MS = 30_000;
 const STATUS_POLL_SYNCING_MS = 3_000;
+const SIBLINGS_POLL_MS = 5 * 60_000;
 
 export function AppProvider({
   authRequired,
@@ -94,6 +97,11 @@ export function AppProvider({
   const viewsState = useAsync(() => api.views().then((r) => r.views), 'views');
   const views = viewsState.data ?? BUILTIN_VIEWS;
 
+  // Optional: a failed load only hides the switcher.
+  const siblingsState = useAsync(() => api.siblings().then((r) => r.siblings), 'siblings');
+  useInterval(() => void siblingsState.reload(), SIBLINGS_POLL_MS);
+  const siblings = siblingsState.data ?? null;
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -115,6 +123,7 @@ export function AppProvider({
       reloadViews: viewsState.reload,
       authRequired,
       logout,
+      siblings,
     }),
     [
       settings,
@@ -128,6 +137,7 @@ export function AppProvider({
       viewsState.reload,
       authRequired,
       logout,
+      siblings,
     ],
   );
 

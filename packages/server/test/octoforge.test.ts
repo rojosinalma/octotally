@@ -8,6 +8,7 @@ import type { Env } from '../src/env';
 import { issueSession } from '../src/lib/auth';
 import { CredentialStore, DELIVERED_TOKEN_KEY } from '../src/lib/octoforge/credentials';
 import { DatabaseError, databaseStatus } from '../src/lib/octoforge/database';
+import { SIBLINGS_KEY, saveSiblings } from '../src/lib/octoforge/siblings';
 import { Poller } from '../src/lib/poller';
 import { Syncer } from '../src/lib/sync';
 import { LayeredToken } from '../src/lib/token';
@@ -135,6 +136,8 @@ describe('without OCTOFORGE_TOKEN', () => {
       ['DELETE', '/api/octoforge/github'],
       ['POST', '/api/octoforge/database/adopt'],
       ['DELETE', '/api/octoforge/database'],
+      ['PUT', '/api/octoforge/siblings'],
+      ['DELETE', '/api/octoforge/siblings'],
       ['GET', '/api/octoforge'],
     ] as const) {
       const r = await req(path, { method, headers: auth() });
@@ -476,5 +479,102 @@ describe('database routes', () => {
     const f = await b.req('/api/octoforge/database', { method: 'DELETE', headers: auth() });
     expect(f.status).toBe(500);
     expect(f.body.message).toBe('read-only data dir');
+  });
+});
+
+describe('siblings', () => {
+  const LIST = {
+    forge: {
+      title: 'Octoforge',
+      url: 'https://forge.example.com',
+      icon: 'https://forge.example.com/favicon.svg',
+    },
+    members: [
+      {
+        name: 'octotally',
+        title: 'Octotally',
+        url: 'https://tally.example.com',
+        icon: 'https://tally.example.com/favicon.svg',
+      },
+      { name: 'octowarden', title: 'Octowarden', url: 'https://warden.example.com' },
+    ],
+    updated_at: '2026-10-21T12:00:00Z',
+  };
+  const put = (req: Awaited<ReturnType<typeof build>>['req'], json: unknown, headers = auth()) =>
+    req('/api/octoforge/siblings', { method: 'PUT', headers, json });
+
+  test('PUT needs the bearer', async () => {
+    const { req } = await build();
+    expect((await put(req, LIST, {} as ReturnType<typeof auth>)).status).toBe(401);
+    expect((await req('/api/octoforge/siblings', { method: 'DELETE' })).status).toBe(401);
+    expect((await req('/api/siblings')).body.siblings).toBeNull();
+  });
+
+  test('PUT stores the list, GET /api/siblings shows it with self, DELETE clears it', async () => {
+    const { req } = await build();
+    const r = await put(req, LIST);
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(true);
+
+    const got = await req('/api/siblings');
+    expect(got.status).toBe(200);
+    const s = got.body.siblings as Record<string, unknown>;
+    expect(s).toMatchObject({ ...LIST, self: 'octotally' });
+    expect(typeof s.received_at).toBe('string');
+
+    const next = { ...LIST, members: [LIST.members[1]], updated_at: '2026-10-21T13:00:00Z' };
+    expect((await put(req, next)).status).toBe(200);
+    expect((await req('/api/siblings')).body.siblings).toMatchObject({ members: next.members });
+
+    const del = await req('/api/octoforge/siblings', { method: 'DELETE', headers: auth() });
+    expect(del.body).toMatchObject({ ok: true, removed: true });
+    expect((await req('/api/siblings')).body.siblings).toBeNull();
+    const again = await req('/api/octoforge/siblings', { method: 'DELETE', headers: auth() });
+    expect(again.body).toMatchObject({ ok: true, removed: false });
+  });
+
+  test('bad bodies are 400 and leave the stored list alone', async () => {
+    const { req } = await build();
+    expect((await put(req, LIST)).status).toBe(200);
+    for (const bad of [
+      null,
+      { ...LIST, forge: { title: 'Octoforge', url: 'javascript:alert(1)' } },
+      { ...LIST, members: [{ ...LIST.members[0], url: 'ftp://tally.example.com' }] },
+      { ...LIST, members: [{ ...LIST.members[0], icon: '/favicon.svg' }] },
+      { ...LIST, members: [{ ...LIST.members[0], name: 'Bad Name' }] },
+      { ...LIST, updated_at: 'yesterday' },
+      { forge: LIST.forge, updated_at: LIST.updated_at },
+    ]) {
+      const r = await put(req, bad);
+      expect(r.status, JSON.stringify(bad)).toBe(400);
+      expect(r.body.kind).toBe('validation');
+    }
+    expect((await req('/api/siblings')).body.siblings).toMatchObject({ members: LIST.members });
+  });
+
+  test('the list stays out of /api/settings, and a malformed row hides the switcher', async () => {
+    const { req, dbh } = await build();
+    await put(req, LIST);
+    expect((await req('/api/settings')).text).not.toContain(SIBLINGS_KEY);
+    const t = dbh.db.t.settings;
+    await dbh.db.orm.update(t).set({ value: '{"list":{"forge":1}}' }).where(eq(t.key, SIBLINGS_KEY));
+    expect((await req('/api/siblings')).body.siblings).toBeNull();
+  });
+
+  test('a stored list is not shown once OCTOFORGE_TOKEN is unset', async () => {
+    const { dbh } = await build();
+    await saveSiblings(dbh.db, LIST);
+    const tokens = new LayeredToken(async () => null, undefined);
+    const syncer = new Syncer({ db: dbh.db, tokens, clientOptions: { fetch: fakeGitHub(), sleep: noSleep } });
+    const app = createApp({
+      env: env({ OCTOFORGE_TOKEN: undefined }),
+      dbh,
+      syncer,
+      poller: new Poller(dbh.db, syncer),
+      tokens,
+      sessionSecret: SECRET,
+    });
+    const r = await app.request('/api/siblings');
+    expect(((await r.json()) as { siblings: unknown }).siblings).toBeNull();
   });
 });

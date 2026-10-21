@@ -617,3 +617,8 @@ kbd {
 .login-title {
   font-size: var(--text-title-size-large, 24px);
 }
+
+.switcher-icon {
+  display: block;
+  border-radius: 3px;
+}

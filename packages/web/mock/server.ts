@@ -204,6 +204,28 @@ Bun.serve({
       return ok('Sync started');
     }
     if (p === '/api/status') return ok('ok', { status });
+    if (p === '/api/siblings') {
+      if (process.env.MOCK_SIBLINGS === '0') return ok('ok', { siblings: null });
+      const now = new Date().toISOString();
+      return ok('ok', {
+        siblings: {
+          forge: { title: 'Octoforge', url: 'https://forge.example.com', icon: '/favicon.svg' },
+          members: [
+            { name: 'octohatchery', title: 'Octohatchery', url: 'https://hatchery.example.com' },
+            { name: 'octotally', title: 'Octotally', url: '/', icon: '/favicon.svg' },
+            {
+              name: 'octowarden',
+              title: 'Octowarden',
+              url: 'https://warden.example.com',
+              icon: 'https://warden.example.com/missing.svg',
+            },
+          ],
+          updated_at: now,
+          received_at: now,
+          self: 'octotally',
+        },
+      });
+    }
     if (p === '/api/views' && m === 'GET') return ok('ok', { views });
     if (p === '/api/views' && m === 'POST') {
       const body = (await req.json()) as { name: string; query: string };

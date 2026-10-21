@@ -6,6 +6,7 @@ import type { AppDeps } from '../app';
 import { buildDailyDigest, dispatchDigest, lastDigestAt } from '../lib/digest';
 import { getItem, listActivity, listItems, repoCounts, setHidden } from '../lib/items';
 import { notifiers } from '../lib/notifiers';
+import { loadSiblings } from '../lib/octoforge/siblings';
 import { getSettings, getView, listViews, patchSettings } from '../lib/settings';
 import { errInfo, log } from '../log';
 import { VERSION } from '../version';
@@ -144,6 +145,11 @@ export function apiRoutes(deps: AppDeps) {
 
   // --- misc ----------------------------------------------------------------------
   app.get('/repos', async (c) => jsonOk(c, 'ok', { repos: await repoCounts(db) }));
+
+  // The member switcher: only when this instance is an Octoforge member and has a list.
+  app.get('/siblings', async (c) =>
+    jsonOk(c, 'ok', { siblings: deps.env.OCTOFORGE_TOKEN ? await loadSiblings(db) : null }),
+  );
 
   app.get('/notifiers', async (c) => {
     const settings = await getSettings(db);

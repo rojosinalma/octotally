@@ -5,6 +5,7 @@ import type {
   Item,
   Settings,
   SettingsPatch,
+  SiblingsView,
   SyncStatus,
   View,
 } from '@octotally/shared';
@@ -85,6 +86,7 @@ export const api = {
   settings: () => request<{ settings: Settings }>(API_ROUTES.settings),
   patchSettings: (patch: SettingsPatch) => put<{ settings: Settings }>(API_ROUTES.settings, patch),
   repos: () => request<{ repos: { repo: string; count: number }[] }>(API_ROUTES.repos),
+  siblings: () => request<{ siblings: SiblingsView | null }>(API_ROUTES.siblings),
   version: () => request<{ version: string }>('/api/version').then((r) => r.version),
   testNotifier: (name: string) => post<object>(API_ROUTES.testNotifier(name)),
   authStatus: () => request<{ authenticated: boolean; required: boolean }>('/auth/status'),
