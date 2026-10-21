@@ -16,6 +16,21 @@ permissions:
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d ci"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/ci
     steps:
       - uses: actions/checkout@v7
 
@@ -27,6 +42,10 @@ jobs:
       - run: bun run typecheck
       - run: bun run lint
       - run: bun test
+      - name: Tests on Postgres
+        run: bun test packages/server
+        env:
+          TEST_DB_ENGINE: postgres
       - run: bun run build
 
       - uses: docker/setup-buildx-action@v4

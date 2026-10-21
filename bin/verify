@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Full verification: typecheck, lint, tests, build, then a container smoke test against /health.
-# Usage: bin/verify            (SKIP_DOCKER=1 bin/verify skips the container part)
+# Full verification: typecheck, lint, tests (SQLite and Postgres), build, then a container smoke test
+# against /health. Postgres: TEST_DATABASE_URL when set, else a throwaway container on a random port.
+# Usage: bin/verify            (SKIP_DOCKER=1 bin/verify skips every container: Postgres tests skip too)
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 IMAGE="${VERIFY_IMAGE:-octotally:verify}"
 HEALTH_TIMEOUT="${VERIFY_HEALTH_TIMEOUT:-30}"
+PG_IMAGE="${VERIFY_PG_IMAGE:-postgres:17.11-alpine}"
+PG_TIMEOUT="${VERIFY_PG_TIMEOUT:-60}"
 container=""
+pg_container=""
 
 fail() {
   echo "verify: FAIL $1" >&2
@@ -17,6 +21,9 @@ fail() {
 cleanup() {
   if [[ -n "$container" ]]; then
     docker rm -f "$container" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$pg_container" ]]; then
+    docker rm -f "$pg_container" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
@@ -28,10 +35,44 @@ step() {
   "$@" || fail "$name"
 }
 
+# Throwaway Postgres for the tests; only reachable on loopback, removed on exit.
+start_postgres() {
+  local pw
+  pw=$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')
+  pg_container=$(docker run --rm -d -p 127.0.0.1:0:5432 -e POSTGRES_PASSWORD="$pw" -e POSTGRES_DB=verify \
+    "$PG_IMAGE") || return 1
+  local port
+  port=$(docker port "$pg_container" 5432/tcp | head -n1 | sed 's/.*://')
+  [[ -n "$port" ]] || return 1
+  # TCP only: the image's init phase runs a socket-only server that would answer too early.
+  for ((i = 0; i < PG_TIMEOUT; i++)); do
+    if docker exec "$pg_container" pg_isready -q -h 127.0.0.1 -U postgres -d verify 2>/dev/null; then
+      export TEST_DATABASE_URL="postgres://postgres:${pw}@127.0.0.1:${port}/verify"
+      return 0
+    fi
+    sleep 1
+  done
+  docker logs "$pg_container" >&2 2>&1 || true
+  return 1
+}
+
 step install bun install --frozen-lockfile
 step typecheck bun run typecheck
 step lint bun run lint
+
+if [[ -n "${TEST_DATABASE_URL:-}" ]]; then
+  echo "verify: postgres from TEST_DATABASE_URL"
+elif [[ "${SKIP_DOCKER:-0}" == "1" ]]; then
+  echo "verify: postgres tests SKIPPED (SKIP_DOCKER=1 and no TEST_DATABASE_URL)"
+else
+  command -v docker >/dev/null 2>&1 || fail "docker (not installed; set SKIP_DOCKER=1 to skip)"
+  step "postgres (${PG_IMAGE})" start_postgres
+fi
+
 step test bun test
+if [[ -n "${TEST_DATABASE_URL:-}" ]]; then
+  step test-postgres env TEST_DB_ENGINE=postgres bun test packages/server
+fi
 step build bun run build
 
 if [[ "${SKIP_DOCKER:-0}" == "1" ]]; then
@@ -40,35 +81,53 @@ if [[ "${SKIP_DOCKER:-0}" == "1" ]]; then
   exit 0
 fi
 
-command -v docker >/dev/null 2>&1 || fail "docker (not installed; set SKIP_DOCKER=1 to skip)"
-
 step docker-build docker build -t "$IMAGE" .
 
-echo "verify: docker-run"
-container=$(docker run --rm -d -p 127.0.0.1:0:3000 -e DATA_DIR=/data "$IMAGE") || fail docker-run
+# Runs the image with extra `docker run` arguments and waits for /health; leaves it running in $container.
+smoke() {
+  local name=$1
+  shift
+  echo "verify: docker-run ($name)"
+  container=$(docker run --rm -d -p 127.0.0.1:0:3000 -e DATA_DIR=/data "$@" "$IMAGE") || fail "docker-run ($name)"
 
-port=$(docker port "$container" 3000/tcp | head -n1 | sed 's/.*://') || fail docker-port
-[[ -n "$port" ]] || fail docker-port
+  local port
+  port=$(docker port "$container" 3000/tcp | head -n1 | sed 's/.*://') || fail docker-port
+  [[ -n "$port" ]] || fail docker-port
 
-echo "verify: health (http://127.0.0.1:${port}/health, up to ${HEALTH_TIMEOUT}s)"
-ok=0
-for ((i = 0; i < HEALTH_TIMEOUT; i++)); do
-  if curl -fsS -o /dev/null "http://127.0.0.1:${port}/health"; then
-    ok=1
-    break
+  echo "verify: health ($name, http://127.0.0.1:${port}/health, up to ${HEALTH_TIMEOUT}s)"
+  local ok=0
+  for ((i = 0; i < HEALTH_TIMEOUT; i++)); do
+    if curl -fsS -o /dev/null "http://127.0.0.1:${port}/health" 2>/dev/null; then
+      ok=1
+      break
+    fi
+    if ! docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "$ok" != "1" ]]; then
+    echo "verify: container logs:" >&2
+    docker logs "$container" >&2 2>&1 || true
+    fail "health ($name)"
   fi
-  if ! docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
-    break
-  fi
-  sleep 1
-done
 
-if [[ "$ok" != "1" ]]; then
-  echo "verify: container logs:" >&2
-  docker logs "$container" >&2 2>&1 || true
-  fail health
+  curl -fsS "http://127.0.0.1:${port}/health"
+  echo
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  container=""
+}
+
+smoke sqlite
+
+# The image on Postgres: reaches the throwaway database over the default bridge, in its own schema.
+if [[ -n "$pg_container" ]]; then
+  pg_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$pg_container")
+  pg_url=$(sed -E "s#@127\.0\.0\.1:[0-9]+/#@${pg_ip}:5432/#" <<<"$TEST_DATABASE_URL")
+  smoke postgres -e DATABASE_URL="$pg_url" -e DATABASE_SCHEMA=smoke
+  docker exec "$pg_container" psql -qtA -U postgres -d verify \
+    -c "select count(*) from smoke.views" | grep -qv '^0$' || fail "postgres smoke (no views seeded in schema smoke)"
 fi
 
-curl -fsS "http://127.0.0.1:${port}/health"
-echo
 echo "verify: OK"
