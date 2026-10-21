@@ -3,6 +3,17 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.4.0](https://github.com/rojosinalma/octotally/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* the `theme` setting is replaced by `skin`, `palette` and `mode`. An existing `theme` row is converted on the first start (light or dark themes keep their mode, dark_dracula becomes the dracula palette) and then removed. PUT /api/settings ignores `theme` from now on.
+
+### Features
+
+* draw the UI with tailor, every skin and palette ([#13](https://github.com/rojosinalma/octotally/issues/13)) ([2168e97](https://github.com/rojosinalma/octotally/commit/2168e977547bcbb7536a6a6d750f377ac5cc17a2))
+
 ## [0.3.0](https://github.com/rojosinalma/octotally/compare/v0.2.0...v0.3.0) (2026-10-21)
 
 
