@@ -1,12 +1,21 @@
-import pino, { type Logger } from 'pino';
+import pino, { type DestinationStream, type Logger } from 'pino';
 
-export type Subsystem = 'http' | 'github' | 'poll' | 'digest' | 'notify' | 'db' | 'boot' | 'auth';
+export type Subsystem =
+  | 'http'
+  | 'github'
+  | 'poll'
+  | 'digest'
+  | 'notify'
+  | 'db'
+  | 'boot'
+  | 'auth'
+  | 'octoforge';
 
 let root: Logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
-/** Replace the root logger (boot sets the level from env; tests silence it). */
-export function configureLog(level: string): Logger {
-  root = pino({ level });
+/** Replace the root logger (boot sets the level from env; tests silence it or capture the lines). */
+export function configureLog(level: string, destination?: DestinationStream): Logger {
+  root = destination ? pino({ level }, destination) : pino({ level });
   return root;
 }
 

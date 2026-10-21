@@ -6,7 +6,7 @@
       "**",
       "!**/dist",
       "!**/node_modules",
-      "!**/drizzle",
+      "!**/src/db/migrations",
       "!data",
       "!.release-please-manifest.json"
     ]

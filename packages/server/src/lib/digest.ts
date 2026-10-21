@@ -1,7 +1,6 @@
 import type { Activity, Item, Settings } from '@octotally/shared';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import type { Db } from '../db';
-import { digests as digestsTable } from '../db/schema';
 import { errInfo, log } from '../log';
 import { listActivitySince, listItems } from './items';
 import { type Notifier, notifiers } from './notifiers';
@@ -49,15 +48,15 @@ export function formatActivity(items: Map<string, Item>, activity: Activity[]): 
 }
 
 /** Everything noticed since `since` (ISO, by seenAt) plus the active / needs-PR counters. `null` when quiet. */
-export function buildDailyDigest(
+export async function buildDailyDigest(
   db: Db,
   settings: Settings,
   since: string,
   now = new Date(),
-): DigestMessage | null {
-  const activity = listActivitySince(db, since);
+): Promise<DigestMessage | null> {
+  const activity = await listActivitySince(db, since);
   if (activity.length === 0) return null;
-  const items = new Map(listItems(db).map((i) => [i.id, i] as const));
+  const items = new Map((await listItems(db)).map((i) => [i.id, i] as const));
   const visible = activity.filter((a) => items.get(a.itemId)?.hidden !== 'done');
   if (visible.length === 0) return null;
   const counts = countRelevant([...items.values()], settings, now);
@@ -70,9 +69,9 @@ export function buildDailyDigest(
 }
 
 /** Right after a sync: the activity that sync produced, as one message. `null` when nothing. */
-export function buildRealtimeDigest(db: Db, newActivity: Activity[]): DigestMessage | null {
+export async function buildRealtimeDigest(db: Db, newActivity: Activity[]): Promise<DigestMessage | null> {
   if (newActivity.length === 0) return null;
-  const items = new Map(listItems(db).map((i) => [i.id, i] as const));
+  const items = new Map((await listItems(db)).map((i) => [i.id, i] as const));
   const visible = newActivity.filter((a) => items.get(a.itemId)?.hidden !== 'done');
   if (visible.length === 0) return null;
   return {
@@ -82,27 +81,25 @@ export function buildRealtimeDigest(db: Db, newActivity: Activity[]): DigestMess
   };
 }
 
-export function lastDigestAt(db: Db, kind: DigestKind): string | null {
-  return (
-    db
-      .select({ sentAt: digestsTable.sentAt })
-      .from(digestsTable)
-      .where(eq(digestsTable.kind, kind))
-      .orderBy(desc(digestsTable.sentAt))
-      .limit(1)
-      .get()?.sentAt ?? null
-  );
+export async function lastDigestAt(db: Db, kind: DigestKind): Promise<string | null> {
+  const t = db.t.digests;
+  const [r] = await db.orm
+    .select({ sentAt: t.sentAt })
+    .from(t)
+    .where(eq(t.kind, kind))
+    .orderBy(desc(t.sentAt))
+    .limit(1);
+  return r?.sentAt ?? null;
 }
 
-function alreadySent(db: Db, hash: string, since: string): boolean {
-  return (
-    db
-      .select({ id: digestsTable.id })
-      .from(digestsTable)
-      .where(and(eq(digestsTable.payloadHash, hash), gte(digestsTable.sentAt, since)))
-      .limit(1)
-      .get() !== undefined
-  );
+async function alreadySent(db: Db, hash: string, since: string): Promise<boolean> {
+  const t = db.t.digests;
+  const rows = await db.orm
+    .select({ id: t.id })
+    .from(t)
+    .where(and(eq(t.payloadHash, hash), gte(t.sentAt, since)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 export function configuredNotifiers(settings: Settings): Notifier[] {
@@ -127,7 +124,7 @@ export async function dispatchDigest(
   }
   const hash = hashPayload({ kind: message.kind, lines: message.lines });
   const window = new Date(now.getTime() - 48 * 3_600_000).toISOString();
-  if (alreadySent(db, hash, window)) {
+  if (await alreadySent(db, hash, window)) {
     logger.info({ kind: message.kind }, 'identical digest already sent, skipped');
     return { sent: [], skipped: true };
   }
@@ -135,9 +132,9 @@ export async function dispatchDigest(
   for (const n of targets) {
     try {
       await n.send(message, settings);
-      db.insert(digestsTable)
-        .values({ sentAt: now.toISOString(), kind: message.kind, notifier: n.name, payloadHash: hash })
-        .run();
+      await db.orm
+        .insert(db.t.digests)
+        .values({ sentAt: now.toISOString(), kind: message.kind, notifier: n.name, payloadHash: hash });
       sent.push(n.name);
       logger.info({ kind: message.kind, notifier: n.name, lines: message.lines.length }, 'digest sent');
     } catch (err) {
@@ -167,11 +164,11 @@ export function localClock(now: Date, timezone: string): { date: string; hour: n
 }
 
 /** The daily digest is due once per local day, at or after `digestHour`. */
-export function dailyDue(db: Db, settings: Settings, now = new Date()): boolean {
+export async function dailyDue(db: Db, settings: Settings, now = new Date()): Promise<boolean> {
   if (!settings.digestDaily) return false;
   const { date, hour } = localClock(now, settings.timezone);
   if (hour < settings.digestHour) return false;
-  const last = lastDigestAt(db, 'daily');
+  const last = await lastDigestAt(db, 'daily');
   if (!last) return true;
   return localClock(new Date(last), settings.timezone).date !== date;
 }

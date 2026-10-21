@@ -21,7 +21,7 @@ function env(over: Partial<Env> = {}): Env {
 }
 
 async function build(envOver: Partial<Env> = {}, token: string | null = 't') {
-  const dbh = memDb();
+  const dbh = await memDb();
   const tokens = new StaticToken(token);
   const syncer = new Syncer({ db: dbh.db, tokens, clientOptions: { fetch: fakeGitHub(), sleep: noSleep } });
   if (!token) syncer.noteNoToken('GITHUB_TOKEN not set');
@@ -45,10 +45,10 @@ async function build(envOver: Partial<Env> = {}, token: string | null = 't') {
 }
 
 describe('auth middleware', () => {
-  test('open when neither API_TOKEN nor AUTH_PASSWORD is set', () => {
+  test('open when neither API_TOKEN nor AUTH_PASSWORD is set', async () => {
     expect(apiAllowed(env(), SECRET, undefined, undefined)).toBe(true);
   });
-  test('API_TOKEN alone never locks the browser out; the bearer must match exactly', () => {
+  test('API_TOKEN alone never locks the browser out; the bearer must match exactly', async () => {
     const e = env({ API_TOKEN: 'abc' });
     expect(apiAllowed(e, SECRET, undefined, undefined)).toBe(true);
     expect(apiAllowed(e, SECRET, 'Bearer abc', undefined)).toBe(true);
@@ -59,7 +59,7 @@ describe('auth middleware', () => {
     expect(apiAllowed(gated, SECRET, 'Basic abc', undefined)).toBe(false);
     expect(apiAllowed(gated, SECRET, 'Bearer abc', undefined)).toBe(true);
   });
-  test('AUTH_PASSWORD: a valid cookie passes, a forged or expired one does not', () => {
+  test('AUTH_PASSWORD: a valid cookie passes, a forged or expired one does not', async () => {
     const e = env({ AUTH_PASSWORD: 'pw' });
     expect(apiAllowed(e, SECRET, undefined, undefined)).toBe(false);
     expect(apiAllowed(e, SECRET, undefined, issueSession(SECRET))).toBe(true);
@@ -67,7 +67,7 @@ describe('auth middleware', () => {
     expect(apiAllowed(e, SECRET, undefined, issueSession(SECRET, Date.now() - 31 * 86_400_000))).toBe(false);
     expect(apiAllowed(e, SECRET, 'Bearer anything', undefined)).toBe(false);
   });
-  test('both set: either credential works', () => {
+  test('both set: either credential works', async () => {
     const e = env({ AUTH_PASSWORD: 'pw', API_TOKEN: 'abc' });
     expect(apiAllowed(e, SECRET, 'Bearer abc', undefined)).toBe(true);
     expect(apiAllowed(e, SECRET, undefined, issueSession(SECRET))).toBe(true);
@@ -221,6 +221,14 @@ describe('api routes', () => {
     expect((await req('/api/version')).body).toMatchObject({ ok: true });
     expect((await req('/api/nothing')).status).toBe(404);
     expect((await req('/api/nothing')).body.kind).toBe('not_found');
+  });
+
+  test('/health answers 503 with db: error when the database is gone', async () => {
+    const { req, dbh } = await build();
+    await dbh.close();
+    const h = await req('/health');
+    expect(h.status).toBe(503);
+    expect(h.body).toMatchObject({ ok: false, db: 'error', lastSyncAt: null });
   });
 
   test('SPA fallback: 404 text when the dist is missing', async () => {

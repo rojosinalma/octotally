@@ -22,8 +22,12 @@ Open http://localhost:5173 during development; Vite proxies `/api` and `/health`
 ```sh
 bun test                   # everything
 bun run verify             # = bin/verify: typecheck, lint, tests, build, docker build + /health smoke
-SKIP_DOCKER=1 bin/verify   # without the container part
+SKIP_DOCKER=1 bin/verify   # without the container part (Postgres tests skipped)
 ```
+
+`bin/verify` starts a throwaway Postgres container and runs the server suite on it as well. To do
+that by hand, point `TEST_DATABASE_URL` at a Postgres you can create schemas in and set
+`TEST_DB_ENGINE=postgres`. Without `TEST_DATABASE_URL` the Postgres-only tests skip and say so.
 
 Changes to the grammar, the relevance rules, the digest diffing, the GitHub client (recorded
 GraphQL fixtures under `packages/server/test/fixtures`) or API auth must come with tests. UI
@@ -43,7 +47,7 @@ warning you should not add to.
 | `packages/shared` | The contract: zod schemas for items, settings, views and API envelopes; the search grammar (`search.ts`) shared by server and UI |
 | `packages/server/src/routes` | Hono routes (`/api/*`, `/auth/*`, `/health`), the auth gate, static SPA |
 | `packages/server/src/lib` | GitHub GraphQL client, relevance rules, syncer, poller, digest, notifiers, token source |
-| `packages/server/src/db` | Drizzle schema; migrations under `packages/server/drizzle` (additive only) |
+| `packages/server/src/db` | Drizzle schema for SQLite (`schema.ts`) and Postgres (`schema.pg.ts`, change both together); migrations under `src/db/migrations/{sqlite,postgres}` (additive only, `bun run db:generate` writes both) |
 | `packages/web` | React + Primer SPA |
 
 Conventions:

@@ -31,7 +31,7 @@ function withNewComment(at: string) {
 }
 
 async function seeded() {
-  const h = memDb();
+  const h = await memDb();
   const run = (o: Record<string, unknown> = {}) =>
     new Syncer({
       db: h.db,
@@ -46,7 +46,7 @@ async function seeded() {
 describe('digest building', () => {
   test('daily digest groups activity by item and adds counters', async () => {
     const { h } = await seeded();
-    const msg = buildDailyDigest(h.db, S, '2000-01-01T00:00:00Z', new Date('2026-10-13T12:00:00Z'));
+    const msg = await buildDailyDigest(h.db, S, '2000-01-01T00:00:00Z', new Date('2026-10-13T12:00:00Z'));
     expect(msg).not.toBeNull();
     expect(must(msg).title).toMatch(/1 new event/);
     expect(must(msg).lines[0]).toContain('acme/widgets#142');
@@ -56,20 +56,20 @@ describe('digest building', () => {
 
   test('nothing new → null; done items are excluded', async () => {
     const { h } = await seeded();
-    expect(buildDailyDigest(h.db, S, '2999-01-01T00:00:00Z')).toBeNull();
-    setHidden(h.db, ISSUE, 'done');
-    expect(buildDailyDigest(h.db, S, '2000-01-01T00:00:00Z')).toBeNull();
+    expect(await buildDailyDigest(h.db, S, '2999-01-01T00:00:00Z')).toBeNull();
+    await setHidden(h.db, ISSUE, 'done');
+    expect(await buildDailyDigest(h.db, S, '2000-01-01T00:00:00Z')).toBeNull();
   });
 
   test('realtime digest uses the sync output', async () => {
     const { h, newActivity } = await seeded();
-    const msg = buildRealtimeDigest(h.db, newActivity);
+    const msg = await buildRealtimeDigest(h.db, newActivity);
     expect(msg?.kind).toBe('realtime');
     expect(msg?.lines).toHaveLength(2);
-    expect(buildRealtimeDigest(h.db, [])).toBeNull();
+    expect(await buildRealtimeDigest(h.db, [])).toBeNull();
   });
 
-  test('hash is stable for the same content', () => {
+  test('hash is stable for the same content', async () => {
     expect(hashPayload({ a: 1 })).toBe(hashPayload({ a: 1 }));
     expect(hashPayload({ a: 1 })).not.toBe(hashPayload({ a: 2 }));
   });
@@ -82,7 +82,7 @@ describe('dispatchDigest', () => {
     const original = must(notifiers.discord).send;
     must(notifiers.discord).send = async (m) => void sent.push(m.title);
     try {
-      const msg = must(buildDailyDigest(h.db, S, '2000-01-01T00:00:00Z'));
+      const msg = must(await buildDailyDigest(h.db, S, '2000-01-01T00:00:00Z'));
       expect(await dispatchDigest(h.db, S, msg)).toEqual({ sent: ['discord'], skipped: false });
       expect(await dispatchDigest(h.db, S, msg)).toEqual({ sent: [], skipped: true });
       expect(sent).toHaveLength(1);
@@ -104,29 +104,29 @@ describe('dispatchDigest', () => {
 });
 
 describe('daily schedule', () => {
-  test('localClock respects the zone and falls back to UTC', () => {
+  test('localClock respects the zone and falls back to UTC', async () => {
     const t = new Date('2026-10-13T23:30:00Z');
     expect(localClock(t, 'UTC')).toEqual({ date: '2026-10-13', hour: 23 });
     expect(localClock(t, 'Europe/Berlin')).toEqual({ date: '2026-10-14', hour: 1 });
     expect(localClock(t, 'Not/AZone')).toEqual({ date: '2026-10-13', hour: 23 });
   });
 
-  test('dailyDue: off by default, due once per local day at/after digestHour', () => {
-    const h = memDb();
-    expect(dailyDue(h.db, DEFAULT_SETTINGS, new Date('2026-10-13T10:00:00Z'))).toBe(false);
-    const s = patchSettings(h.db, { digestDaily: true, digestHour: 9, timezone: 'UTC' });
-    expect(dailyDue(h.db, s, new Date('2026-10-13T08:59:00Z'))).toBe(false);
-    expect(dailyDue(h.db, s, new Date('2026-10-13T09:00:00Z'))).toBe(true);
-    h.sqlite.run(
-      "INSERT INTO digests (sent_at, kind, notifier, payload_hash) VALUES ('2026-10-13T09:01:00.000Z', 'daily', 'discord', 'h')",
-    );
-    expect(dailyDue(h.db, s, new Date('2026-10-13T15:00:00Z'))).toBe(false);
-    expect(dailyDue(h.db, s, new Date('2026-10-14T09:30:00Z'))).toBe(true);
+  test('dailyDue: off by default, due once per local day at/after digestHour', async () => {
+    const h = await memDb();
+    expect(await dailyDue(h.db, DEFAULT_SETTINGS, new Date('2026-10-13T10:00:00Z'))).toBe(false);
+    const s = await patchSettings(h.db, { digestDaily: true, digestHour: 9, timezone: 'UTC' });
+    expect(await dailyDue(h.db, s, new Date('2026-10-13T08:59:00Z'))).toBe(false);
+    expect(await dailyDue(h.db, s, new Date('2026-10-13T09:00:00Z'))).toBe(true);
+    await h.db.orm
+      .insert(h.db.t.digests)
+      .values({ sentAt: '2026-10-13T09:01:00.000Z', kind: 'daily', notifier: 'discord', payloadHash: 'h' });
+    expect(await dailyDue(h.db, s, new Date('2026-10-13T15:00:00Z'))).toBe(false);
+    expect(await dailyDue(h.db, s, new Date('2026-10-14T09:30:00Z'))).toBe(true);
   });
 });
 
 describe('discord notifier', () => {
-  test('chunkLines respects the limit and never splits a line', () => {
+  test('chunkLines respects the limit and never splits a line', async () => {
     const lines = ['a'.repeat(30), 'b'.repeat(30), 'c'.repeat(30)];
     const chunks = chunkLines(lines, 65);
     expect(chunks).toHaveLength(2);
@@ -143,7 +143,7 @@ describe('discord notifier', () => {
     ).rejects.toThrow(/https/);
   });
 
-  test('configured only when the URL is set', () => {
+  test('configured only when the URL is set', async () => {
     expect(must(notifiers.discord).configured(DEFAULT_SETTINGS)).toBe(false);
     expect(must(notifiers.discord).configured(S)).toBe(true);
   });

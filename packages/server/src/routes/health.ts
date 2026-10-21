@@ -6,12 +6,12 @@ import { VERSION } from '../version';
 /** Always unauthenticated. 503 when the database does not answer. */
 export function healthRoutes(deps: AppDeps) {
   const app = new Hono();
-  app.get('/', (c) => {
-    const dbOk = deps.dbh.ping();
-    let status: ReturnType<AppDeps['syncer']['status']> | null = null;
+  app.get('/', async (c) => {
+    const dbOk = await deps.dbh.ping();
+    let status: Awaited<ReturnType<AppDeps['syncer']['status']>> | null = null;
     if (dbOk) {
       try {
-        status = deps.syncer.status(deps.poller.nextRunAt);
+        status = await deps.syncer.status(deps.poller.nextRunAt);
       } catch {
         status = null;
       }
