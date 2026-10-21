@@ -18,6 +18,10 @@ still have no linked PR, your own backlog. Mark items done or mute them until so
 search with GitHub qualifiers plus relative dates, and get a Discord digest of what moved. It reads
 from GitHub with a read-only token and ships as one container.
 
+Octotally runs on its own with SQLite, or on Postgres if you prefer. It can also be a member of
+[Octoforge](https://github.com/rojosinalma/octoforge), which hands it a GitHub token and can host
+its database; that part is opt-in, see [`docs/octoforge.md`](docs/octoforge.md).
+
 Features, configuration, search syntax, API and operations are documented in [`docs/`](docs/);
 the design is in [`docs/SDD.md`](docs/SDD.md).
 

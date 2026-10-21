@@ -1,0 +1,27 @@
+{
+  "contract": 1,
+  "name": "octotally",
+  "title": "Octotally",
+  "description": "GitHub involvement tracker: every issue, PR and discussion you are part of, filtered to what still needs you.",
+  "icon": "/favicon.svg",
+  "health": "/health",
+  "github": {
+    "auth": ["pat"],
+    "pat": {
+      "classic_scopes": ["repo", "read:discussion"],
+      "fine_grained": {
+        "issues": "read",
+        "pull_requests": "read",
+        "discussions": "read",
+        "metadata": "read"
+      },
+      "user_identity": true
+    }
+  },
+  "database": { "engines": ["sqlite", "postgres"], "schema": true },
+  "env": {
+    "github_token": "GITHUB_TOKEN",
+    "database_url": "DATABASE_URL",
+    "database_schema": "DATABASE_SCHEMA"
+  }
+}

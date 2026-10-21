@@ -13,6 +13,8 @@ const EnvSchema = z.object({
   AUTH_PASSWORD: z.string().optional(),
   API_TOKEN: z.string().optional(),
   SESSION_SECRET: z.string().optional(),
+  /** Shared bearer for /api/octoforge/*; unset = the Octoforge routes do not exist. */
+  OCTOFORGE_TOKEN: z.string().optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
   WEB_DIST: z.string().optional(),
   /** postgres://, postgresql:// or sqlite:<path>; unset = SQLite at DATA_DIR/octotally.db. */
@@ -36,6 +38,7 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
     AUTH_PASSWORD: empty(source.AUTH_PASSWORD),
     API_TOKEN: empty(source.API_TOKEN),
     SESSION_SECRET: empty(source.SESSION_SECRET),
+    OCTOFORGE_TOKEN: empty(source.OCTOFORGE_TOKEN),
     LOG_LEVEL: empty(source.LOG_LEVEL),
     WEB_DIST: empty(source.WEB_DIST),
     DATABASE_URL: empty(source.DATABASE_URL),

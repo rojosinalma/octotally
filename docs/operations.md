@@ -26,6 +26,11 @@ plus `-wal`/`-shm` side files) and `session.secret` when `SESSION_SECRET` is not
 volume on local disk, not on a network filesystem. A backup is a copy of the directory while the
 container is stopped, or `sqlite3 octotally.db ".backup out.db"` while it runs.
 
+On Postgres (`DATABASE_URL`) the data lives in the schema `DATABASE_SCHEMA` (default `octotally`),
+migration journal included (`<schema>.__drizzle_migrations`). Back it up with
+`pg_dump --schema=octotally`. `DATA_DIR` still holds `session.secret` and, after an Octoforge
+adoption, `octoforge-database.json`; keep both, the first one decrypts a token Octoforge delivered.
+
 Rows are never deleted: items that leave `involves:` keep their row and local state, so the
 database grows with your involvement, not with time. Activity is capped at `activityKeep` rows
 per item.
