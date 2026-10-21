@@ -498,7 +498,7 @@ describe('siblings', () => {
       },
       { name: 'octowarden', title: 'Octowarden', url: 'https://warden.example.com' },
     ],
-    updated_at: '2026-10-21T12:00:00Z',
+    updated_at: new Date().toISOString(),
   };
   const put = (req: Awaited<ReturnType<typeof build>>['req'], json: unknown, headers = auth()) =>
     req('/api/octoforge/siblings', { method: 'PUT', headers, json });
@@ -522,7 +522,7 @@ describe('siblings', () => {
     expect(s).toMatchObject({ ...LIST, self: 'octotally' });
     expect(typeof s.received_at).toBe('string');
 
-    const next = { ...LIST, members: [LIST.members[1]], updated_at: '2026-10-21T13:00:00Z' };
+    const next = { ...LIST, members: [LIST.members[1]], updated_at: new Date().toISOString() };
     expect((await put(req, next)).status).toBe(200);
     expect((await req('/api/siblings')).body.siblings).toMatchObject({ members: next.members });
 
@@ -559,6 +559,20 @@ describe('siblings', () => {
     const t = dbh.db.t.settings;
     await dbh.db.orm.update(t).set({ value: '{"list":{"forge":1}}' }).where(eq(t.key, SIBLINGS_KEY));
     expect((await req('/api/siblings')).body.siblings).toBeNull();
+  });
+
+  test('a list older than siblingsMaxAgeMin hides the switcher; a fresh send shows it again', async () => {
+    const { req } = await build();
+    const old = new Date(Date.now() - 181 * 60_000).toISOString();
+    expect((await put(req, { ...LIST, updated_at: old })).status).toBe(200);
+    expect((await req('/api/siblings')).body.siblings).toBeNull();
+    expect((await req('/api/settings', { method: 'PUT', json: { siblingsMaxAgeMin: 240 } })).status).toBe(
+      200,
+    );
+    expect((await req('/api/siblings')).body.siblings).toMatchObject({ updated_at: old });
+    await req('/api/settings', { method: 'PUT', json: { siblingsMaxAgeMin: 180 } });
+    expect((await put(req, LIST)).status).toBe(200);
+    expect((await req('/api/siblings')).body.siblings).toMatchObject({ updated_at: LIST.updated_at });
   });
 
   test('a stored list is not shown once OCTOFORGE_TOKEN is unset', async () => {

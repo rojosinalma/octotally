@@ -111,6 +111,8 @@ export const Settings = z.object({
   theme: Theme.default('auto'),
   /** Id of the view shown on load. */
   defaultView: z.string().default('active'),
+  /** Octoforge app switcher: hide the list once its `updated_at` is older (3 × Octoforge's resend period). */
+  siblingsMaxAgeMin: z.number().int().min(5).max(10080).default(180),
 });
 export type Settings = z.infer<typeof Settings>;
 /**

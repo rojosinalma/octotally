@@ -120,7 +120,8 @@ Outside the database: `DATA_DIR/session.secret` (0600) when `SESSION_SECRET` is 
    `DELETE /api/octoforge/database` plus a restart rolls back. Details: [octoforge.md](octoforge.md).
 8. **App switcher.** `PUT /api/octoforge/siblings` validates Octoforge's list (http(s) URLs only)
    and stores it under the settings key `octoforge.siblings`; `GET /api/siblings` hands it to the
-   header menu, and only while `OCTOFORGE_TOKEN` is set.
+   header menu, and only while `OCTOFORGE_TOKEN` is set and the list is younger than
+   `siblingsMaxAgeMin`.
 
 ### Relevance rules
 
@@ -142,7 +143,7 @@ The built-in views express these as search strings (`updated:>{activeWindowDays}
 - **Settings table** (every tunable, editable at runtime from the Settings page or
   `PUT /api/settings`): `activeWindowDays`, `pollIntervalMin`, `backoffMaxMin`, `activityKeep`,
   `digestDaily`, `digestHour`, `timezone`, `digestRealtime`, `discordWebhookUrl`, `theme`,
-  `defaultView`. Read at use time, never cached, so a change applies to the next cycle.
+  `defaultView`, `siblingsMaxAgeMin`. Read at use time, never cached, so a change applies to the next cycle.
 - **Views** are rows, not code; the built-in set is `BUILTIN_VIEWS` in `packages/shared/src/types.ts`.
 
 Full tables: [configuration.md](configuration.md).
@@ -165,7 +166,7 @@ Full tables: [configuration.md](configuration.md).
 | Primer React and the stock Primer themes | The UI should read like GitHub; extra themes reuse Primer's CSS-variable contract. |
 | Non-root image, `/data` volume only | No capabilities, no sockets; `GITHUB_TOKEN` is read from the environment and never persisted. |
 | Octoforge member contract v1, opt-in | One manifest and a handful of routes let Octoforge list the app, hand it a token, move its data and push the app switcher list. Without `OCTOFORGE_TOKEN` none of it exists, so standalone use does not change. The routes have their own bearer so the UI gate and `API_TOKEN` stay as they are. |
-| App switcher from a pushed list | Octoforge knows where every tool runs; each tool only stores what it is told. The links come from outside, so only http(s) URLs pass, and the menu stays hidden without `OCTOFORGE_TOKEN`. |
+| App switcher from a pushed list | Octoforge knows where every tool runs; each tool only stores what it is told. The links come from outside, so only http(s) URLs pass. The menu shows only while Octoforge is set up: `OCTOFORGE_TOKEN` set and a list younger than three send periods. |
 | Delivered token encrypted in the settings table | A handed-over token must survive restarts and win over `GITHUB_TOKEN` without one. It sits under a key outside the `Settings` schema, so the settings API never sees it, and is encrypted (AES-256-GCM, key from HKDF over the session secret) because the database may move to a shared Postgres that a read-only role can read. A rotated secret means a fallback to `GITHUB_TOKEN`, not a crash. |
 
 ## Current scope and non-goals

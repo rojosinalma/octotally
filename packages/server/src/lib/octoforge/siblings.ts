@@ -35,8 +35,16 @@ export async function clearSiblings(db: Db): Promise<boolean> {
   return rows.length > 0;
 }
 
-/** The stored list for the UI, or `null` when there is none or it no longer validates (logged). */
-export async function loadSiblings(db: Db): Promise<SiblingsView | null> {
+/**
+ * The stored list for the UI, or `null` when there is none, it no longer validates (logged), or its
+ * `updated_at` is older than `maxAgeMin`: Octoforge re-sends on a schedule, so an old list means
+ * Octoforge is gone or no longer knows this instance.
+ */
+export async function loadSiblings(
+  db: Db,
+  maxAgeMin: number,
+  now = Date.now(),
+): Promise<SiblingsView | null> {
   const settings = db.t.settings;
   const [row] = await db.orm
     .select({ value: settings.value })
@@ -48,6 +56,7 @@ export async function loadSiblings(db: Db): Promise<SiblingsView | null> {
     const stored = JSON.parse(row.value) as Partial<Stored>;
     const list = OctoforgeSiblings.parse(stored.list);
     const received_at = typeof stored.received_at === 'string' ? stored.received_at : list.updated_at;
+    if (now - Date.parse(list.updated_at) > maxAgeMin * 60_000) return null;
     return { ...list, self: MANIFEST.name, received_at };
   } catch {
     log('octoforge').warn({ key: SIBLINGS_KEY }, 'stored sibling list is malformed; switcher hidden');

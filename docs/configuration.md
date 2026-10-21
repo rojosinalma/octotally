@@ -65,6 +65,7 @@ Stored as key → JSON value in the `settings` table, validated by the shared `S
 | `discordWebhookUrl` | – | Discord webhook (`https://` only); empty = notifier off |
 | `theme` | `auto` | One of the nine Primer themes, `dark_dracula`, or `auto` to follow the OS |
 | `defaultView` | `active` | View shown on load |
+| `siblingsMaxAgeMin` | 180 | [Octoforge](octoforge.md#the-app-switcher) only: the app switcher hides once the list Octoforge sent is older than this (three of Octoforge's 60-minute send periods) |
 
 `PUT /api/settings` takes a partial object and changes only the keys present; validation errors
 come back as `400` with every issue in `message` (`pollIntervalMin: Too small…; theme: Invalid
