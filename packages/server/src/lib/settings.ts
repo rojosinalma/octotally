@@ -1,6 +1,7 @@
 import { BUILTIN_VIEWS, Settings, SettingsPatch, type View } from '@octotally/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db';
+import { log } from '../log';
 
 /** Current settings: stored rows merged over the schema defaults. Read at use time, never cached. */
 export async function getSettings(db: Db): Promise<Settings> {
@@ -40,6 +41,43 @@ export async function patchSettings(db: Db, patch: unknown): Promise<Settings> {
     }
   });
   return getSettings(db);
+}
+
+/** Old Primer `theme` value → the tailor keys it maps to; unknown values map to nothing. */
+export function legacyThemeKeys(theme: unknown): Partial<Pick<Settings, 'mode' | 'palette'>> {
+  if (theme === 'auto') return { mode: 'auto' };
+  if (theme === 'dark_dracula') return { mode: 'dark', palette: 'dracula' };
+  if (typeof theme === 'string' && theme.startsWith('dark')) return { mode: 'dark' };
+  if (typeof theme === 'string' && theme.startsWith('light')) return { mode: 'light' };
+  return {};
+}
+
+/**
+ * Boot-time, idempotent: turns a legacy `theme` row into `mode`/`palette` (only where those keys
+ * have no row yet) and deletes it.
+ */
+export async function migrateLegacyTheme(db: Db): Promise<void> {
+  const moved = await db.transaction(async (tx) => {
+    const [row] = await tx.orm.select().from(tx.t.settings).where(eq(tx.t.settings.key, 'theme')).limit(1);
+    if (!row) return null;
+    let theme: unknown = null;
+    try {
+      theme = JSON.parse(row.value);
+    } catch {
+      // Unparseable: nothing to carry over, the row is still removed.
+    }
+    const keys = legacyThemeKeys(theme);
+    const now = new Date().toISOString();
+    for (const [key, value] of Object.entries(keys)) {
+      await tx.orm
+        .insert(tx.t.settings)
+        .values({ key, value: JSON.stringify(value), updatedAt: now })
+        .onConflictDoNothing();
+    }
+    await tx.orm.delete(tx.t.settings).where(eq(tx.t.settings.key, 'theme'));
+    return { theme, keys };
+  });
+  if (moved) log('db').info(moved, 'migrated the legacy theme setting');
 }
 
 /** Inserts the built-in views that are missing; never overwrites a user's rename/reorder. */

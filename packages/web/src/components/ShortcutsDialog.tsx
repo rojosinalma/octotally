@@ -1,4 +1,4 @@
-import { Dialog } from '@primer/react';
+import { Ui } from 'tailor-react';
 
 const SHORTCUTS: [string, string][] = [
   ['j / k', 'Move selection down / up'],
@@ -13,16 +13,16 @@ const SHORTCUTS: [string, string][] = [
   ['Esc', 'Close panel or dialog'],
 ];
 
-export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
+export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog title="Keyboard shortcuts" onClose={onClose} width="medium">
+    <Ui.Dialog id="shortcuts" open={open} title="Keyboard shortcuts" onClose={onClose}>
       <dl className="shortcuts">
         {SHORTCUTS.map(([keys, what]) => (
           <div key={keys} className="shortcut-row">
             <dt>
               {keys.split(' / ').map((k, i) => (
                 <span key={k}>
-                  {i > 0 && <span className="shortcut-or"> or </span>}
+                  {i > 0 && <span className="t-muted t-small"> or </span>}
                   <kbd>{k}</kbd>
                 </span>
               ))}
@@ -31,6 +31,6 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </dl>
-    </Dialog>
+    </Ui.Dialog>
   );
 }

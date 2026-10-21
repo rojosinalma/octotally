@@ -20,9 +20,9 @@ function item(over: Partial<Item> = {}): Item {
     type: 'issue',
     number: 1,
     title: 'Energy stats wrong after restart',
-    url: 'https://github.com/maziggy/bambuddy/issues/1',
-    repo: 'maziggy/bambuddy',
-    owner: 'maziggy',
+    url: 'https://github.com/acme/widgets/issues/1',
+    repo: 'acme/widgets',
+    owner: 'acme-dev',
     state: 'open',
     isDraft: false,
     author: 'rojosinalma',
@@ -35,7 +35,7 @@ function item(over: Partial<Item> = {}): Item {
     createdAt: daysAgo(40),
     updatedAt: daysAgo(2),
     lastActivityAt: daysAgo(2),
-    lastActivityBy: 'maziggy',
+    lastActivityBy: 'acme-dev',
     hidden: 'none',
     hiddenAt: null,
     mutedActivityAt: null,
@@ -104,9 +104,9 @@ describe('matchesItem', () => {
     linkedPrs: [
       {
         number: 9,
-        url: 'https://github.com/maziggy/bambuddy/pull/9',
+        url: 'https://github.com/acme/widgets/pull/9',
         state: 'open',
-        repo: 'maziggy/bambuddy',
+        repo: 'acme/widgets',
       },
     ],
   });
@@ -139,9 +139,9 @@ describe('matchesItem', () => {
   test('roles, labels, repo, text', () => {
     expect(matchesItem(parseSearch('role:commenter'), discussion)).toBe(true);
     expect(matchesItem(parseSearch('role:commenter'), open)).toBe(false);
-    expect(matchesItem(parseSearch('label:bug repo:maziggy/bambuddy energy'), open)).toBe(true);
+    expect(matchesItem(parseSearch('label:bug repo:acme/widgets energy'), open)).toBe(true);
     expect(matchesItem(parseSearch('-label:bug'), open)).toBe(false);
-    expect(matchesItem(parseSearch('org:maziggy is:unanswered'), discussion)).toBe(true);
+    expect(matchesItem(parseSearch('org:acme-dev is:unanswered'), discussion)).toBe(true);
   });
 });
 

@@ -5,9 +5,9 @@
 [![latest release](https://img.shields.io/github/v/release/rojosinalma/octotally)](https://github.com/rojosinalma/octotally/releases/latest)
 [![licence](https://img.shields.io/github/license/rojosinalma/octotally)](LICENSE)
 
-| Dashboard (dark dimmed) | Dashboard (light) | Settings |
+| Dashboard (dark) | Dashboard (light) | Settings |
 |---|---|---|
-| ![Dashboard, dark dimmed theme](docs/screenshots/dashboard-dark-dimmed.png) | ![Dashboard, light theme](docs/screenshots/dashboard-light.png) | ![Settings, dark dimmed theme](docs/screenshots/settings-dark-dimmed.png) |
+| ![Dashboard, dark](docs/screenshots/dashboard-primer-dark.png) | ![Dashboard, light](docs/screenshots/dashboard-primer-light.png) | ![Settings, dark](docs/screenshots/settings-primer-dark.png) |
 
 **Every GitHub issue, pull request and discussion you are part of, on one page, filtered to what
 still needs you.**
@@ -51,7 +51,7 @@ docker compose up -d
 
 The image is `ghcr.io/rojosinalma/octotally` (`latest`, `vX.Y`, `vX.Y.Z`); it runs as a non-root
 user and stores everything under `/data`. Everything else — poll interval, active window, digest,
-theme — is set on the Settings page; see [`docs/configuration.md`](docs/configuration.md).
+skin and palette — is set on the Settings page; see [`docs/configuration.md`](docs/configuration.md).
 
 ## Usage
 

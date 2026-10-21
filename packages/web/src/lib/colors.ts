@@ -1,99 +1,57 @@
 import type { Item, LinkedPr, Role } from '@octotally/shared';
-import {
-  CommentDiscussionIcon,
-  DiscussionClosedIcon,
-  GitMergeIcon,
-  GitPullRequestClosedIcon,
-  GitPullRequestDraftIcon,
-  GitPullRequestIcon,
-  type Icon,
-  IssueClosedIcon,
-  IssueOpenedIcon,
-} from '@primer/octicons-react';
 
-/** Primer functional colour tokens (CSS custom properties without the leading `--`). */
-export type ColorToken =
-  | 'fgColor-open'
-  | 'fgColor-closed'
-  | 'fgColor-done'
-  | 'fgColor-muted'
-  | 'fgColor-accent'
-  | 'fgColor-success';
+/** Tailor tone of an item state (GitHub's open/closed/done colours on the palette). */
+export type StateTone = 'success' | 'danger' | 'purple' | 'neutral';
 
 export interface StateVisual {
-  /** Octicon component. */
-  icon: Icon;
-  /** Primer colour token, e.g. `fgColor-open`. */
-  color: ColorToken;
+  /** Sprite icon id (`<set>-<name>` in public/tailor/icons.svg). */
+  icon: string;
+  tone: StateTone;
   /** Accessible label, e.g. "Open pull request". */
   label: string;
-  /** Primer StateLabel status, when one exists. */
-  status:
-    | 'issueOpened'
-    | 'issueClosed'
-    | 'pullOpened'
-    | 'pullClosed'
-    | 'pullMerged'
-    | 'draft'
-    | 'open'
-    | 'closed';
+  /** Tailor state-label state. */
+  state: 'open' | 'closed' | 'done' | 'draft';
 }
 
 type StateInput = Pick<Item, 'type' | 'state' | 'isDraft' | 'isAnswered'>;
+
+export const ICONS = {
+  issueOpen: 'lucide-circle-dot',
+  issueClosed: 'lucide-circle-check',
+  pr: 'lucide-git-pull-request',
+  prClosed: 'lucide-git-pull-request-closed',
+  prDraft: 'lucide-git-pull-request-draft',
+  merged: 'lucide-git-merge',
+  discussion: 'lucide-messages-square',
+  discussionClosed: 'lucide-message-square-x',
+} as const;
 
 export function stateVisual(item: StateInput): StateVisual {
   switch (item.type) {
     case 'issue':
       return item.state === 'open'
-        ? { icon: IssueOpenedIcon, color: 'fgColor-open', label: 'Open issue', status: 'issueOpened' }
-        : { icon: IssueClosedIcon, color: 'fgColor-done', label: 'Closed issue', status: 'issueClosed' };
+        ? { icon: ICONS.issueOpen, tone: 'success', label: 'Open issue', state: 'open' }
+        : { icon: ICONS.issueClosed, tone: 'purple', label: 'Closed issue', state: 'done' };
     case 'pr':
       if (item.state === 'merged')
-        return {
-          icon: GitMergeIcon,
-          color: 'fgColor-done',
-          label: 'Merged pull request',
-          status: 'pullMerged',
-        };
+        return { icon: ICONS.merged, tone: 'purple', label: 'Merged pull request', state: 'done' };
       if (item.state === 'closed')
-        return {
-          icon: GitPullRequestClosedIcon,
-          color: 'fgColor-closed',
-          label: 'Closed pull request',
-          status: 'pullClosed',
-        };
+        return { icon: ICONS.prClosed, tone: 'danger', label: 'Closed pull request', state: 'closed' };
       if (item.isDraft)
-        return {
-          icon: GitPullRequestDraftIcon,
-          color: 'fgColor-muted',
-          label: 'Draft pull request',
-          status: 'draft',
-        };
-      return {
-        icon: GitPullRequestIcon,
-        color: 'fgColor-open',
-        label: 'Open pull request',
-        status: 'pullOpened',
-      };
+        return { icon: ICONS.prDraft, tone: 'neutral', label: 'Draft pull request', state: 'draft' };
+      return { icon: ICONS.pr, tone: 'success', label: 'Open pull request', state: 'open' };
     case 'discussion':
       if (item.state !== 'open')
-        return {
-          icon: DiscussionClosedIcon,
-          color: 'fgColor-muted',
-          label: 'Closed discussion',
-          status: 'closed',
-        };
+        return { icon: ICONS.discussionClosed, tone: 'neutral', label: 'Closed discussion', state: 'closed' };
       return item.isAnswered
-        ? { icon: CommentDiscussionIcon, color: 'fgColor-done', label: 'Answered discussion', status: 'open' }
-        : { icon: CommentDiscussionIcon, color: 'fgColor-open', label: 'Open discussion', status: 'open' };
+        ? { icon: ICONS.discussion, tone: 'purple', label: 'Answered discussion', state: 'done' }
+        : { icon: ICONS.discussion, tone: 'success', label: 'Open discussion', state: 'open' };
   }
 }
 
 export function linkedPrVisual(pr: Pick<LinkedPr, 'state'>): StateVisual {
   return stateVisual({ type: 'pr', state: pr.state, isDraft: false, isAnswered: null });
 }
-
-export const cssVar = (token: ColorToken) => `var(--${token})`;
 
 export const ROLE_LABELS: Record<Role, string> = {
   author: 'Author',

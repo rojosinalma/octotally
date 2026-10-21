@@ -48,7 +48,8 @@ warning you should not add to.
 | `packages/server/src/routes` | Hono routes (`/api/*`, `/auth/*`, `/health`), the auth gate, static SPA |
 | `packages/server/src/lib` | GitHub GraphQL client, relevance rules, syncer, poller, digest, notifiers, token source |
 | `packages/server/src/db` | Drizzle schema for SQLite (`schema.ts`) and Postgres (`schema.pg.ts`, change both together); migrations under `src/db/migrations/{sqlite,postgres}` (additive only, `bun run db:generate` writes both) |
-| `packages/web` | React + Primer SPA |
+| `packages/web` | React SPA drawn with tailor (`tailor-react`); its own styles in `src/app.css` use `--t-*` tokens only |
+| `public/tailor`, `vendor/tailor-react` | Vendored by tailor's tool (`managed by tailor` header): never edit, sync instead |
 
 Conventions:
 
@@ -72,7 +73,7 @@ Conventions:
   `parseSearch` and `matchesItem`, and the table in `docs/search.md`.
 - **Relevance rule:** `packages/server/src/lib/relevance.ts` holds pure functions over an `Item`;
   the test file is table-driven, so a rule is one function plus one row.
-- **Theme:** one CSS file under `packages/web/src/themes/`; steps in [docs/themes.md](docs/themes.md).
+- **Theme:** skins and palettes come from tailor; see [docs/themes.md](docs/themes.md).
 - **Token source:** implement `TokenSource` in `packages/server/src/lib/token.ts`.
 
 ## Commits and PRs

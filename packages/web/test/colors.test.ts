@@ -1,53 +1,44 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  CommentDiscussionIcon,
-  GitMergeIcon,
-  GitPullRequestClosedIcon,
-  GitPullRequestDraftIcon,
-  GitPullRequestIcon,
-  IssueClosedIcon,
-  IssueOpenedIcon,
-} from '@primer/octicons-react';
-import { needsPr, stateVisual } from '../src/lib/colors';
+import { ICONS, needsPr, stateVisual } from '../src/lib/colors';
 
 describe('stateVisual', () => {
   test('issues', () => {
     expect(stateVisual({ type: 'issue', state: 'open', isDraft: false, isAnswered: null })).toMatchObject({
-      icon: IssueOpenedIcon,
-      color: 'fgColor-open',
+      icon: ICONS.issueOpen,
+      tone: 'success',
     });
     expect(stateVisual({ type: 'issue', state: 'closed', isDraft: false, isAnswered: null })).toMatchObject({
-      icon: IssueClosedIcon,
-      color: 'fgColor-done',
+      icon: ICONS.issueClosed,
+      tone: 'purple',
     });
   });
   test('pull requests', () => {
     expect(stateVisual({ type: 'pr', state: 'open', isDraft: false, isAnswered: null })).toMatchObject({
-      icon: GitPullRequestIcon,
-      color: 'fgColor-open',
+      icon: ICONS.pr,
+      tone: 'success',
     });
     expect(stateVisual({ type: 'pr', state: 'open', isDraft: true, isAnswered: null })).toMatchObject({
-      icon: GitPullRequestDraftIcon,
-      color: 'fgColor-muted',
+      icon: ICONS.prDraft,
+      tone: 'neutral',
     });
     expect(stateVisual({ type: 'pr', state: 'merged', isDraft: false, isAnswered: null })).toMatchObject({
-      icon: GitMergeIcon,
-      color: 'fgColor-done',
+      icon: ICONS.merged,
+      tone: 'purple',
     });
     expect(stateVisual({ type: 'pr', state: 'closed', isDraft: false, isAnswered: null })).toMatchObject({
-      icon: GitPullRequestClosedIcon,
-      color: 'fgColor-closed',
+      icon: ICONS.prClosed,
+      tone: 'danger',
     });
   });
   test('discussions', () => {
     expect(
       stateVisual({ type: 'discussion', state: 'open', isDraft: false, isAnswered: false }),
     ).toMatchObject({
-      icon: CommentDiscussionIcon,
-      color: 'fgColor-open',
+      icon: ICONS.discussion,
+      tone: 'success',
     });
-    expect(stateVisual({ type: 'discussion', state: 'open', isDraft: false, isAnswered: true }).color).toBe(
-      'fgColor-done',
+    expect(stateVisual({ type: 'discussion', state: 'open', isDraft: false, isAnswered: true }).tone).toBe(
+      'purple',
     );
   });
 });

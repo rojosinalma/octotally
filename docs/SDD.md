@@ -22,7 +22,7 @@ and host its database.
 |---|---|
 | `packages/shared` | The contract. Zod schemas for `Item`, `Activity`, `Settings`, `View`, API envelopes and routes (`src/types.ts`); the search grammar, matcher and sorter (`src/search.ts`); the Octoforge manifest schema (`src/octoforge.ts`). Imported by server and web, so there is one definition of every shape and one parser. |
 | `packages/server` | Bun + [Hono](https://hono.dev). `src/routes` validates input and delegates to `src/lib`; `src/db` holds the Drizzle schema for `bun:sqlite` and Postgres (`postgres`), migrations under `src/db/migrations/{sqlite,postgres}`. Serves the built SPA from `WEB_DIST`. |
-| `packages/web` | Vite + React + [Primer React](https://primer.style). Talks to `/api/*`, filters client-side with the shared grammar for instant feedback, and lets the server run the authoritative query. |
+| `packages/web` | Vite + React, drawn with [tailor](https://github.com/rojosinalma/tailor) (`tailor-react`, vendored under `vendor/tailor-react/`; CSS, skins, palettes and icons under `public/tailor/`). Talks to `/api/*`, filters client-side with the shared grammar for instant feedback, and lets the server run the authoritative query. |
 
 ```
 GitHub GraphQL ──search(involves:@me, ISSUE_ADVANCED)──┐
@@ -37,7 +37,7 @@ GitHub GraphQL ──search(involves:@me, ISSUE_ADVANCED)──┐
                  Hono routes (/api/*, /health) ── applySearch(items, q, settings) ◄───────────┘
                            ▲
                            │ fetch, bearer / session cookie
-                      React SPA (Primer) ── same grammar for live filtering
+                      React SPA (tailor) ── same grammar for live filtering
 ```
 
 ### Server components (`packages/server/src`)
@@ -64,8 +64,8 @@ GitHub GraphQL ──search(involves:@me, ISSUE_ADVANCED)──┐
 autocomplete, item list, item panel) and `pages/Settings.tsx`; `pages/Login.tsx` when
 `/auth/status` says `required && !authenticated`. `hooks/useApp.tsx` holds the client state and
 talks to `api.ts`; `lib/search.ts` re-runs the shared grammar on the loaded items while typing;
-`hooks/useKeyboard.ts` implements the shortcuts; `theme.tsx` wires the Primer themes plus
-`themes/dark_dracula.css`.
+`hooks/useKeyboard.ts` implements the shortcuts; `theme.tsx` keeps tailor's skin, palette and mode
+in step with the `skin`/`palette`/`mode` settings ([themes.md](themes.md)).
 
 ## Data model and storage
 
@@ -142,7 +142,7 @@ The built-in views express these as search strings (`updated:>{activeWindowDays}
   `PORT`, `DATA_DIR`, `WEB_DIST`. Nothing tunable lives here.
 - **Settings table** (every tunable, editable at runtime from the Settings page or
   `PUT /api/settings`): `activeWindowDays`, `pollIntervalMin`, `backoffMaxMin`, `activityKeep`,
-  `digestDaily`, `digestHour`, `timezone`, `digestRealtime`, `discordWebhookUrl`, `theme`,
+  `digestDaily`, `digestHour`, `timezone`, `digestRealtime`, `discordWebhookUrl`, `skin`, `palette`, `mode`,
   `defaultView`, `siblingsMaxAgeMin`. Read at use time, never cached, so a change applies to the next cycle.
 - **Views** are rows, not code; the built-in set is `BUILTIN_VIEWS` in `packages/shared/src/types.ts`.
 
@@ -163,7 +163,7 @@ Full tables: [configuration.md](configuration.md).
 | `involves:` searches plus id-only role searches | GitHub returns no per-item role; one cheap search per qualifier derives the roles for `role:` filtering. |
 | `TokenSource` interface | The only seam auth changes touch: `EnvToken` now, an OAuth implementation later, nothing else knows where the token comes from. |
 | Notifiers as a registry | Adding a transport is one file and one line; configuration comes from settings so the UI lists it automatically. |
-| Primer React and the stock Primer themes | The UI should read like GitHub; extra themes reuse Primer's CSS-variable contract. |
+| tailor (`tailor-react`) with every skin and palette, `primer` skin by default | One React component set renders tailor's markup, so every tailor skin and palette applies; the `primer` skin keeps the GitHub look as the default. Vendored files are synced by tailor's tool, never edited, so new skins and palettes arrive without code changes. Replaces Primer React and the Primer themes (0.4). |
 | Non-root image, `/data` volume only | No capabilities, no sockets; `GITHUB_TOKEN` is read from the environment and never persisted. |
 | Octoforge member contract v1, opt-in | One manifest and a handful of routes let Octoforge list the app, hand it a token, move its data and push the app switcher list. Without `OCTOFORGE_TOKEN` none of it exists, so standalone use does not change. The routes have their own bearer so the UI gate and `API_TOKEN` stay as they are. |
 | App switcher from a pushed list | Octoforge knows where every tool runs; each tool only stores what it is told. The links come from outside, so only http(s) URLs pass. The menu shows only while Octoforge is set up: `OCTOFORGE_TOKEN` set and a list younger than three send periods. |

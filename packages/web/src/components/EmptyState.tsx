@@ -1,7 +1,5 @@
 import type { SyncStatus } from '@octotally/shared';
-import { AlertIcon, CheckCircleIcon, KeyIcon, SearchIcon } from '@primer/octicons-react';
-import { Link } from '@primer/react';
-import { Blankslate } from '@primer/react/experimental';
+import { Ui } from 'tailor-react';
 import { relativeTime } from '../lib/format';
 
 interface Props {
@@ -15,68 +13,63 @@ interface Props {
 export function EmptyState({ kind, status, message, onClear, onRetry }: Props) {
   if (kind === 'no-token') {
     return (
-      <Blankslate border spacious>
-        <Blankslate.Visual>
-          <KeyIcon size="medium" />
-        </Blankslate.Visual>
-        <Blankslate.Heading>Connect a GitHub token</Blankslate.Heading>
-        <Blankslate.Description>
+      <Ui.EmptyState icon="bi-key" title="Connect a GitHub token">
+        <p>
           Octotally reads your involvement through the GitHub API. Create a{' '}
-          <Link
-            href="https://github.com/settings/personal-access-tokens/new"
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
             fine-grained personal access token
-          </Link>{' '}
+          </a>{' '}
           with <strong>read-only</strong> access to Issues, Pull requests, Discussions and Metadata on the
           repositories you care about (or all repositories). Then set <code>GITHUB_TOKEN</code> in the
           environment and restart the server.
-          {status?.lastError && (
-            <>
-              <br />
-              <span className="fg-danger">Last error: {status.lastError}</span>
-            </>
-          )}
-        </Blankslate.Description>
-      </Blankslate>
+        </p>
+        {status?.lastError && (
+          <p className="t-tone-text" data-tone="danger">
+            Last error: {status.lastError}
+          </p>
+        )}
+      </Ui.EmptyState>
     );
   }
   if (kind === 'error') {
     return (
-      <Blankslate border>
-        <Blankslate.Visual>
-          <AlertIcon size="medium" />
-        </Blankslate.Visual>
-        <Blankslate.Heading>Could not load items</Blankslate.Heading>
-        <Blankslate.Description>{message ?? 'Unknown error'}</Blankslate.Description>
-        {onRetry && <Blankslate.PrimaryAction onClick={onRetry}>Try again</Blankslate.PrimaryAction>}
-      </Blankslate>
+      <Ui.EmptyState
+        icon="bi-exclamation-triangle"
+        title="Could not load items"
+        actions={
+          onRetry && (
+            <Ui.Button variant="primary" onClick={onRetry}>
+              Try again
+            </Ui.Button>
+          )
+        }
+      >
+        <p>{message ?? 'Unknown error'}</p>
+      </Ui.EmptyState>
     );
   }
   if (kind === 'no-results') {
     return (
-      <Blankslate border>
-        <Blankslate.Visual>
-          <SearchIcon size="medium" />
-        </Blankslate.Visual>
-        <Blankslate.Heading>No items match</Blankslate.Heading>
-        <Blankslate.Description>
-          Try removing a filter or widening the activity window.
-        </Blankslate.Description>
-        {onClear && <Blankslate.PrimaryAction onClick={onClear}>Clear filters</Blankslate.PrimaryAction>}
-      </Blankslate>
+      <Ui.EmptyState
+        icon="bi-search"
+        title="No items match"
+        actions={
+          onClear && (
+            <Ui.Button variant="primary" onClick={onClear}>
+              Clear filters
+            </Ui.Button>
+          )
+        }
+      >
+        <p>Try removing a filter or widening the activity window.</p>
+      </Ui.EmptyState>
     );
   }
   return (
-    <Blankslate border spacious>
-      <Blankslate.Visual>
-        <CheckCircleIcon size="medium" className="fg-success" />
-      </Blankslate.Visual>
-      <Blankslate.Heading>Nothing needs your attention</Blankslate.Heading>
-      <Blankslate.Description>
+    <Ui.EmptyState icon="bi-check-circle" title="Nothing needs your attention">
+      <p>
         {status?.nextSyncAt ? `Next check ${relativeTime(status.nextSyncAt)}.` : 'Waiting for the next sync.'}
-      </Blankslate.Description>
-    </Blankslate>
+      </p>
+    </Ui.EmptyState>
   );
 }

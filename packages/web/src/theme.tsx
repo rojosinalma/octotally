@@ -1,96 +1,66 @@
-// Theme wiring for Primer React 38 + Primer Primitives 11.
+// Skin, palette and mode: tailor's switcher (tailor-react) on the stored app settings.
 //
-// Primitives ship one CSS file per theme; each is scoped to
-//   [data-color-mode="light"][data-light-theme="<name>"]  or
-//   [data-color-mode="dark"][data-dark-theme="<name>"]    or
-//   [data-color-mode="auto"] + prefers-color-scheme.
-// Importing all nine makes every theme available at runtime; the active one is chosen by the
-// attributes on <html> (set here, so the page background follows) and by the ThemeProvider props
-// (so components read the same scheme from context).
-import '@primer/primitives/dist/css/primitives.css';
-import '@primer/primitives/dist/css/functional/themes/light.css';
-import '@primer/primitives/dist/css/functional/themes/light-colorblind.css';
-import '@primer/primitives/dist/css/functional/themes/light-tritanopia.css';
-import '@primer/primitives/dist/css/functional/themes/light-high-contrast.css';
-import '@primer/primitives/dist/css/functional/themes/dark.css';
-import '@primer/primitives/dist/css/functional/themes/dark-dimmed.css';
-import '@primer/primitives/dist/css/functional/themes/dark-colorblind.css';
-import '@primer/primitives/dist/css/functional/themes/dark-tritanopia.css';
-import '@primer/primitives/dist/css/functional/themes/dark-high-contrast.css';
-// Extra themes: generated from Primer's dark tokens with the same selector scheme, so they plug in
-// exactly like the stock ones (see src/themes/README.md).
-import './themes/dark_dracula.css';
+// The vendored head snippet (public/tailor/tailor-head.html) paints the cached choice before the first
+// render; the server settings win once they load. Changes made with the pickers (footer mode toggle) are
+// written back to the settings, so every browser opens with the same look.
+import type { Settings } from '@octotally/shared';
+import { useEffect, useRef } from 'react';
+import { setTailorTheme, type TailorThemeChange } from 'tailor-react';
+import { useApp } from './hooks/useApp';
 
-import { Theme } from '@octotally/shared';
-import { BaseStyles } from '@primer/react';
-import { ThemeProvider, type ThemeProviderProps } from '@primer/react/next';
-import { type ReactNode, useEffect } from 'react';
+let applying = false;
 
-export const THEME_STORAGE_KEY = 'octotally.theme';
-
-export const THEME_LABELS: Record<Theme, string> = {
-  auto: 'Sync with system',
-  light: 'Light',
-  light_colorblind: 'Light colorblind',
-  light_tritanopia: 'Light tritanopia',
-  light_high_contrast: 'Light high contrast',
-  dark: 'Dark',
-  dark_dimmed: 'Dark dimmed',
-  dark_colorblind: 'Dark colorblind',
-  dark_tritanopia: 'Dark tritanopia',
-  dark_high_contrast: 'Dark high contrast',
-  dark_dracula: 'Dracula',
-};
-
-export const THEMES: Theme[] = Theme.options;
-
-export function isTheme(value: unknown): value is Theme {
-  return typeof value === 'string' && (THEMES as string[]).includes(value);
-}
-
-/** Primer ThemeProvider props for a settings theme value. */
-export function themeProviderProps(
-  theme: Theme,
-): Pick<ThemeProviderProps, 'colorMode' | 'dayScheme' | 'nightScheme'> {
-  if (theme === 'auto') return { colorMode: 'auto', dayScheme: 'light', nightScheme: 'dark' };
-  if (theme.startsWith('dark')) return { colorMode: 'dark', dayScheme: 'light', nightScheme: theme };
-  return { colorMode: 'light', dayScheme: theme, nightScheme: 'dark' };
-}
-
-/** Mirrors the ThemeProvider attributes onto <html> so body/background follow the theme too. */
-export function applyThemeToDocument(theme: Theme): void {
-  const props = themeProviderProps(theme);
-  const html = document.documentElement;
-  html.setAttribute('data-color-mode', props.colorMode ?? 'auto');
-  html.setAttribute('data-light-theme', props.dayScheme ?? 'light');
-  html.setAttribute('data-dark-theme', props.nightScheme ?? 'dark');
-}
-
-export function readCachedTheme(): Theme {
+/** Sets the page theme without writing it back to the settings (the caller already saved it). */
+export function applyTheme(change: TailorThemeChange): void {
+  applying = true;
   try {
-    const cached = localStorage.getItem(THEME_STORAGE_KEY);
-    return isTheme(cached) ? cached : 'auto';
-  } catch {
-    return 'auto';
+    setTailorTheme(change);
+  } finally {
+    applying = false;
   }
 }
 
-export function cacheTheme(theme: Theme): void {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    // Storage may be unavailable (private mode); the server copy still wins on next load.
-  }
+type ThemeKeys = Pick<Settings, 'skin' | 'palette' | 'mode'>;
+
+/** What the page shows now, in settings terms. */
+function pageTheme(): ThemeKeys {
+  const d = document.documentElement.dataset;
+  const choice = d.modeChoice ?? d.mode;
+  return {
+    skin: d.skin ?? '',
+    palette: d.palette ?? '',
+    mode: choice === 'dark' || choice === 'light' ? choice : 'auto',
+  };
 }
 
-export function ThemeRoot({ theme, children }: { theme: Theme; children: ReactNode }) {
+/** Keeps the page theme and the `skin`/`palette`/`mode` settings in step. Renders nothing. */
+export function ThemeSync() {
+  const { settings, settingsLoaded, updateSettings } = useApp();
+  const latest = useRef({ settings, settingsLoaded, updateSettings });
+  latest.current = { settings, settingsLoaded, updateSettings };
+
+  // Server → page: once the settings arrive, and whenever another tab or client changed them.
   useEffect(() => {
-    applyThemeToDocument(theme);
-    cacheTheme(theme);
-  }, [theme]);
-  return (
-    <ThemeProvider {...themeProviderProps(theme)}>
-      <BaseStyles className="app-root">{children}</BaseStyles>
-    </ThemeProvider>
-  );
+    if (!settingsLoaded) return;
+    applyTheme({ skin: settings.skin, palette: settings.palette, mode: settings.mode });
+  }, [settingsLoaded, settings.skin, settings.palette, settings.mode]);
+
+  // Page → server: a picker changed the theme.
+  useEffect(() => {
+    const onTheme = () => {
+      const { settings: s, settingsLoaded: loaded, updateSettings: save } = latest.current;
+      if (applying || !loaded) return;
+      const now = pageTheme();
+      const patch: Partial<ThemeKeys> = {};
+      if (now.skin && now.skin !== s.skin) patch.skin = now.skin;
+      if (now.palette && now.palette !== s.palette) patch.palette = now.palette;
+      if (now.mode !== s.mode) patch.mode = now.mode;
+      if (Object.keys(patch).length) void save(patch, { silent: true });
+    };
+    const html = document.documentElement;
+    html.addEventListener('t:theme', onTheme);
+    return () => html.removeEventListener('t:theme', onTheme);
+  }, []);
+
+  return null;
 }

@@ -18,7 +18,7 @@ const REPOS = [
   'drizzle-team/drizzle-orm',
   'vitejs/vite',
 ];
-const PEOPLE = ['maziggy', 'octocat', 'hubot', 'monalisa', 'defunkt', 'mojombo'];
+const PEOPLE = ['acme-dev', 'octocat', 'hubot', 'monalisa', 'defunkt', 'mojombo'];
 const LABELS = [
   'bug',
   'enhancement',
@@ -98,7 +98,7 @@ function makeItem(i: number): Item {
       LABELS[i % LABELS.length] as string,
       ...(i % 3 === 0 ? [LABELS[(i + 2) % LABELS.length] as string] : []),
     ],
-    assignees: i % 5 === 2 ? ['maziggy'] : [],
+    assignees: i % 5 === 2 ? ['acme-dev'] : [],
     roles,
     commentCount,
     linkedPrs,
@@ -118,7 +118,9 @@ function makeItem(i: number): Item {
 const items: Item[] = Array.from({ length: 25 }, (_, i) => makeItem(i));
 let settings: Settings = {
   ...DEFAULT_SETTINGS,
-  theme: (process.env.MOCK_THEME as Settings['theme']) ?? 'auto',
+  skin: process.env.MOCK_SKIN ?? DEFAULT_SETTINGS.skin,
+  palette: process.env.MOCK_PALETTE ?? DEFAULT_SETTINGS.palette,
+  mode: (process.env.MOCK_MODE as Settings['mode']) ?? DEFAULT_SETTINGS.mode,
 };
 let views: View[] = [
   ...BUILTIN_VIEWS,
@@ -130,7 +132,7 @@ let status: SyncStatus = {
   lastError: null,
   nextSyncAt: new Date(now + 9 * 60_000).toISOString(),
   syncing: false,
-  githubLogin: 'maziggy',
+  githubLogin: 'acme-dev',
   githubRateRemaining: 4821,
   githubRateResetAt: new Date(now + 40 * 60_000).toISOString(),
   itemCount: items.length,
@@ -176,7 +178,7 @@ Bun.serve({
 
     if (p === '/api/items' && m === 'GET') {
       const q = url.searchParams.get('q') ?? '';
-      const result = applySearch(items, q, { settings, me: 'maziggy' });
+      const result = applySearch(items, q, { settings, me: 'acme-dev' });
       return ok('ok', { items: result, total: result.length, query: q });
     }
     const itemMatch = /^\/api\/items\/([^/]+)(?:\/(mute|done|restore))?$/.exec(p);

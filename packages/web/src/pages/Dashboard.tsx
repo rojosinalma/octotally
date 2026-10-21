@@ -1,6 +1,7 @@
 import type { Item, View } from '@octotally/shared';
 import { matchesItem, parseSearch, substituteSettings, tokenize } from '@octotally/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Ui } from 'tailor-react';
 import { api, type ItemAction } from '../api';
 import { FilterChips } from '../components/FilterChips';
 import { Footer } from '../components/Footer';
@@ -196,12 +197,14 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
   }, [reposState.data, items]);
 
   return (
-    <div className="app-shell">
-      <Header
-        onShowShortcuts={onShowShortcuts}
-        search={<SearchBar ref={searchRef} value={query} onSubmit={setQuery} context={suggestContext} />}
-      />
-      <div className="app-body">
+    <Ui.AppShell
+      nav={
+        <Header
+          onShowShortcuts={onShowShortcuts}
+          search={<SearchBar ref={searchRef} value={query} onSubmit={setQuery} context={suggestContext} />}
+        />
+      }
+      side={
         <Sidebar
           query={query}
           onQuery={setQuery}
@@ -210,26 +213,29 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
           repos={reposState.data ?? []}
           items={items ?? []}
         />
-        <main className="app-main" aria-label="Items">
-          <FilterChips query={query} onChange={setQuery} />
-          <div className="list-summary fg-muted" aria-live="polite">
-            {items ? `${items.length} ${items.length === 1 ? 'item' : 'items'}` : ''}
-          </div>
-          <ItemList
-            items={items}
-            loading={itemsState.loading}
-            error={itemsState.error}
-            status={status}
-            query={query}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onOpenPanel={setPanelId}
-            onAction={(item, action) => void runAction(item, action)}
-            onClear={() => setQuery('')}
-            onRetry={() => void itemsState.reload()}
-          />
-        </main>
-      </div>
+      }
+      foot={<Footer />}
+    >
+      <h1 className="t-visually-hidden">Items</h1>
+      <Ui.Stack gap="2" className="dashboard-main">
+        <FilterChips query={query} onChange={setQuery} />
+        <div className="list-summary t-small t-muted" aria-live="polite">
+          {items ? `${items.length} ${items.length === 1 ? 'item' : 'items'}` : ''}
+        </div>
+        <ItemList
+          items={items}
+          loading={itemsState.loading}
+          error={itemsState.error}
+          status={status}
+          query={query}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onOpenPanel={setPanelId}
+          onAction={(item, action) => void runAction(item, action)}
+          onClear={() => setQuery('')}
+          onRetry={() => void itemsState.reload()}
+        />
+      </Ui.Stack>
       {panelItem && (
         <ItemPanel
           item={panelItem}
@@ -237,10 +243,9 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
           onAction={(i, a) => void runAction(i, a)}
         />
       )}
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
+      <div className="t-visually-hidden" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
-      <Footer />
-    </div>
+    </Ui.AppShell>
   );
 }

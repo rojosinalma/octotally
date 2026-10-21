@@ -4,7 +4,7 @@ import { loadEnv } from './env';
 import { loadSessionSecret } from './lib/auth';
 import { CredentialStore } from './lib/octoforge/credentials';
 import { Poller } from './lib/poller';
-import { seedViews } from './lib/settings';
+import { migrateLegacyTheme, seedViews } from './lib/settings';
 import { Syncer } from './lib/sync';
 import { LayeredToken } from './lib/token';
 import { configureLog, errInfo, log } from './log';
@@ -30,6 +30,7 @@ const dbh = await openDb(target).catch((err) => {
   process.exit(1);
 });
 await seedViews(dbh.db);
+await migrateLegacyTheme(dbh.db);
 
 const sessionSecret = loadSessionSecret(env.SESSION_SECRET, env.DATA_DIR);
 // A token delivered by Octoforge (encrypted in the settings table) wins over GITHUB_TOKEN.

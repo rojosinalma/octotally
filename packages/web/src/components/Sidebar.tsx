@@ -1,7 +1,6 @@
 import { type Item, substituteSettings, type View } from '@octotally/shared';
-import { PencilIcon, PlusIcon } from '@primer/octicons-react';
-import { ActionList, Button, CounterLabel, Dialog, FormControl, NavList, TextInput } from '@primer/react';
 import { type MouseEvent, useMemo, useState } from 'react';
+import { Ui, useConfirm } from 'tailor-react';
 import { api } from '../api';
 import { useApp } from '../hooks/useApp';
 import { useToast } from '../hooks/useToast';
@@ -40,6 +39,7 @@ const LABEL_LIMIT = 10;
 export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items }: Props) {
   const { views, reloadViews, settings } = useApp();
   const { toast } = useToast();
+  const confirm = useConfirm();
   // Views store `{setting}` placeholders; the search bar only ever shows the resolved query.
   const resolve = (view: View) => substituteSettings(view.query, settings);
   const [repoFilter, setRepoFilter] = useState('');
@@ -94,6 +94,14 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
     }
   };
   const remove = async (view: View) => {
+    const ok = await confirm(
+      `Delete view "${view.name}"?`,
+      'The saved search is removed. Items are not affected.',
+      {
+        label: 'Delete',
+      },
+    );
+    if (!ok) return;
     setBusy(true);
     try {
       await api.deleteView(view.id);
@@ -107,253 +115,223 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
     }
   };
 
-  const viewItem = (view: View) => (
-    <NavList.Item
-      key={view.id}
-      href={`/?q=${encodeURIComponent(resolve(view))}`}
-      aria-current={activeViewId === view.id ? 'page' : undefined}
-      onClick={(e: MouseEvent) => {
-        e.preventDefault();
-        onQuery(resolve(view));
-      }}
-    >
-      {view.name}
-      <NavList.TrailingVisual>
-        {viewCounts[view.id] !== undefined && <CounterLabel>{viewCounts[view.id]}</CounterLabel>}
-      </NavList.TrailingVisual>
-      {!view.builtin && (
-        <NavList.TrailingAction
-          icon={PencilIcon}
-          label={`Edit view ${view.name}`}
-          onClick={() => openEdit(view)}
-        />
-      )}
-    </NavList.Item>
+  const viewItem = (view: View) => {
+    const count = viewCounts[view.id];
+    return (
+      <li key={view.id} className="view-item">
+        <a
+          className="t-sidebar-item"
+          href={`/?q=${encodeURIComponent(resolve(view))}`}
+          aria-current={activeViewId === view.id ? 'page' : undefined}
+          onClick={(e: MouseEvent) => {
+            e.preventDefault();
+            onQuery(resolve(view));
+          }}
+        >
+          <span className="t-sidebar-item-name">{view.name}</span>
+          {count !== undefined && <Ui.Counter>{count}</Ui.Counter>}
+        </a>
+        {!view.builtin && (
+          <Ui.Button
+            variant="ghost"
+            size="xs"
+            iconOnly
+            className="view-edit"
+            aria-label={`Edit view ${view.name}`}
+            tip="Edit view"
+            onClick={() => openEdit(view)}
+          >
+            <Ui.Icon name="bi-pencil" />
+          </Ui.Button>
+        )}
+      </li>
+    );
+  };
+
+  /** One facet option: a toggle on the query (multi-select facets AND their tokens). */
+  const option = (key: string, label: string, selected: boolean, onClick: () => void, trail?: number) => (
+    <Ui.List.Item
+      key={key}
+      selected={selected}
+      onClick={onClick}
+      name={<Ui.Truncate tip={label}>{label}</Ui.Truncate>}
+      trail={trail !== undefined ? <Ui.Counter>{trail}</Ui.Counter> : undefined}
+    />
+  );
+
+  const facet = (
+    id: string,
+    title: string,
+    multi: boolean,
+    body: React.ReactNode,
+    extra?: React.ReactNode,
+  ) => (
+    <section className="facet" aria-labelledby={id}>
+      <h3 className="facet-heading" id={id}>
+        {title}
+      </h3>
+      {extra}
+      <Ui.List size="sm" multi={multi} aria-labelledby={id}>
+        {body}
+      </Ui.List>
+    </section>
   );
 
   return (
-    <aside className="sidebar" aria-label="Views and filters">
-      <NavList aria-label="Views" className="sidebar-nav">
-        <NavList.Group title="Views">
-          {builtin.map(viewItem)}
-          {custom.map(viewItem)}
-        </NavList.Group>
-      </NavList>
+    <div className="sidebar">
+      <Ui.Sidebar label="Views">
+        <Ui.Sidebar.Group>Views</Ui.Sidebar.Group>
+        {builtin.map(viewItem)}
+        {custom.map(viewItem)}
+      </Ui.Sidebar>
       <div className="sidebar-action">
-        <Button
-          size="small"
-          variant="invisible"
-          leadingVisual={PlusIcon}
-          onClick={openCreate}
-          disabled={!query.trim()}
-        >
-          Save current search as view
-        </Button>
+        <Ui.Button size="sm" variant="ghost" onClick={openCreate} disabled={!query.trim()}>
+          <Ui.Icon name="bi-plus-lg" /> Save current search as view
+        </Ui.Button>
       </div>
 
       <h2 className="sidebar-heading">Filters</h2>
-      <div className="facet">
-        <h3 className="facet-heading" id="facet-type">
-          Type
-        </h3>
-        <ActionList role="listbox" selectionVariant="multiple" aria-labelledby="facet-type">
-          {TYPE_FACETS.map(([token, label]) => (
-            <ActionList.Item
-              key={token}
-              selected={hasToken(query, token)}
-              onSelect={() => onQuery(toggleToken(query, token))}
-            >
-              {label}
-            </ActionList.Item>
-          ))}
-        </ActionList>
-      </div>
-      <div className="facet">
-        <h3 className="facet-heading" id="facet-state">
-          State
-        </h3>
-        <ActionList role="listbox" selectionVariant="multiple" aria-labelledby="facet-state">
-          {STATE_FACETS.map(([token, label]) => (
-            <ActionList.Item
-              key={token}
-              selected={hasToken(query, token)}
-              onSelect={() => onQuery(toggleToken(query, token))}
-            >
-              {label}
-            </ActionList.Item>
-          ))}
-          <ActionList.Item
-            selected={hasToken(query, '-linked:pr')}
-            onSelect={() => onQuery(toggleToken(query, '-linked:pr'))}
-          >
-            Needs PR
-          </ActionList.Item>
-        </ActionList>
-      </div>
-      <div className="facet">
-        <h3 className="facet-heading" id="facet-role">
-          Role
-        </h3>
-        <ActionList role="listbox" selectionVariant="multiple" aria-labelledby="facet-role">
-          {(Object.keys(ROLE_LABELS) as (keyof typeof ROLE_LABELS)[]).map((role) => {
-            const token = `role:${role}`;
-            return (
-              <ActionList.Item
-                key={role}
-                selected={hasToken(query, token)}
-                onSelect={() => onQuery(toggleToken(query, token))}
-              >
-                {ROLE_LABELS[role]}
-              </ActionList.Item>
+      {facet(
+        'facet-type',
+        'Type',
+        true,
+        TYPE_FACETS.map(([token, label]) =>
+          option(token, label, hasToken(query, token), () => onQuery(toggleToken(query, token))),
+        ),
+      )}
+      {facet('facet-state', 'State', true, [
+        ...STATE_FACETS.map(([token, label]) =>
+          option(token, label, hasToken(query, token), () => onQuery(toggleToken(query, token))),
+        ),
+        option('-linked:pr', 'Needs PR', hasToken(query, '-linked:pr'), () =>
+          onQuery(toggleToken(query, '-linked:pr')),
+        ),
+      ])}
+      {facet(
+        'facet-role',
+        'Role',
+        true,
+        (Object.keys(ROLE_LABELS) as (keyof typeof ROLE_LABELS)[]).map((role) => {
+          const token = `role:${role}`;
+          return option(token, ROLE_LABELS[role], hasToken(query, token), () =>
+            onQuery(toggleToken(query, token)),
+          );
+        }),
+      )}
+      {facet('facet-activity', 'Activity', false, [
+        ...ACTIVITY_FACETS.map(([value, label]) =>
+          option(value, label, activeUpdated === value, () =>
+            onQuery(setSingleQualifier(query, 'updated', activeUpdated === value ? null : value)),
+          ),
+        ),
+        option('any', 'Any time', activeUpdated === null, () =>
+          onQuery(setSingleQualifier(query, 'updated', null)),
+        ),
+      ])}
+      {facet(
+        'facet-repo',
+        'Repository',
+        true,
+        visibleRepos.length === 0 ? (
+          <p className="t-small t-muted facet-empty">No repositories</p>
+        ) : (
+          visibleRepos.map(({ repo, count }) => {
+            const token = `repo:${repo}`;
+            return option(
+              token,
+              repo,
+              hasToken(query, token),
+              () => onQuery(toggleToken(query, token)),
+              count,
             );
-          })}
-        </ActionList>
-      </div>
-      <div className="facet">
-        <h3 className="facet-heading" id="facet-activity">
-          Activity
-        </h3>
-        <ActionList role="listbox" selectionVariant="single" aria-labelledby="facet-activity">
-          {ACTIVITY_FACETS.map(([value, label]) => (
-            <ActionList.Item
-              key={value}
-              selected={activeUpdated === value}
-              onSelect={() =>
-                onQuery(setSingleQualifier(query, 'updated', activeUpdated === value ? null : value))
-              }
-            >
-              {label}
-            </ActionList.Item>
-          ))}
-          <ActionList.Item
-            selected={activeUpdated === null}
-            onSelect={() => onQuery(setSingleQualifier(query, 'updated', null))}
-          >
-            Any time
-          </ActionList.Item>
-        </ActionList>
-      </div>
-      <div className="facet">
-        <h3 className="facet-heading">Repository</h3>
-        {repos.length > REPO_LIMIT && (
-          <TextInput
-            size="small"
-            block
+          })
+        ),
+        repos.length > REPO_LIMIT && (
+          <Ui.Input
+            size="sm"
             aria-label="Filter repositories"
             placeholder="Filter repositories"
             value={repoFilter}
             onChange={(e) => setRepoFilter(e.target.value)}
             className="facet-filter"
           />
-        )}
-        <ActionList role="listbox" selectionVariant="multiple" aria-label="Repository">
-          {visibleRepos.map(({ repo, count }) => {
-            const token = `repo:${repo}`;
-            return (
-              <ActionList.Item
-                key={repo}
-                selected={hasToken(query, token)}
-                onSelect={() => onQuery(toggleToken(query, token))}
-              >
-                <span className="facet-label" title={repo}>
-                  {repo}
-                </span>
-                <ActionList.TrailingVisual>
-                  <CounterLabel>{count}</CounterLabel>
-                </ActionList.TrailingVisual>
-              </ActionList.Item>
+        ),
+      )}
+      {!repoFilter && filteredRepos.length > REPO_LIMIT && (
+        <Ui.Button variant="ghost" size="xs" onClick={() => setShowAllRepos((s) => !s)}>
+          {showAllRepos ? 'Show fewer' : `Show all ${filteredRepos.length}`}
+        </Ui.Button>
+      )}
+      {labels.length > 0 &&
+        facet(
+          'facet-labels',
+          'Labels',
+          true,
+          visibleLabels.map(([label, count]) => {
+            const token = `label:${label}`;
+            return option(
+              token,
+              label,
+              hasToken(query, token),
+              () => onQuery(toggleToken(query, token)),
+              count,
             );
-          })}
-          {visibleRepos.length === 0 && <ActionList.Item disabled>No repositories</ActionList.Item>}
-        </ActionList>
-        {!repoFilter && filteredRepos.length > REPO_LIMIT && (
-          <Button variant="invisible" size="small" onClick={() => setShowAllRepos((s) => !s)}>
-            {showAllRepos ? 'Show fewer' : `Show all ${filteredRepos.length}`}
-          </Button>
+          }),
         )}
-      </div>
-      {labels.length > 0 && (
-        <div className="facet">
-          <h3 className="facet-heading">Labels</h3>
-          <ActionList role="listbox" selectionVariant="multiple" aria-label="Labels">
-            {visibleLabels.map(([label, count]) => {
-              const token = `label:${label}`;
-              return (
-                <ActionList.Item
-                  key={label}
-                  selected={hasToken(query, token)}
-                  onSelect={() => onQuery(toggleToken(query, token))}
-                >
-                  <span className="facet-label" title={label}>
-                    {label}
-                  </span>
-                  <ActionList.TrailingVisual>
-                    <CounterLabel>{count}</CounterLabel>
-                  </ActionList.TrailingVisual>
-                </ActionList.Item>
-              );
-            })}
-          </ActionList>
-          {labels.length > LABEL_LIMIT && (
-            <Button variant="invisible" size="small" onClick={() => setShowAllLabels((s) => !s)}>
-              {showAllLabels ? 'Show fewer' : `Show all ${labels.length}`}
-            </Button>
-          )}
-        </div>
+      {labels.length > LABEL_LIMIT && (
+        <Ui.Button variant="ghost" size="xs" onClick={() => setShowAllLabels((s) => !s)}>
+          {showAllLabels ? 'Show fewer' : `Show all ${labels.length}`}
+        </Ui.Button>
       )}
 
-      {dialog && (
-        <Dialog
-          title={dialog.mode === 'create' ? 'Save view' : 'Edit view'}
-          onClose={() => setDialog(null)}
-          width="large"
-          footerButtons={[
-            ...(dialog.mode === 'edit'
-              ? [
-                  {
-                    content: 'Delete',
-                    buttonType: 'danger' as const,
-                    onClick: () => void remove(dialog.view),
-                    disabled: busy,
-                  },
-                ]
-              : []),
-            { content: 'Cancel', onClick: () => setDialog(null) },
-            {
-              content: 'Save',
-              buttonType: 'primary',
-              onClick: () => void submitDialog(),
-              disabled: busy || !name.trim(),
-            },
-          ]}
-        >
-          <form
-            className="stack"
+      <Ui.Dialog
+        id="view-dialog"
+        open={dialog !== null}
+        title={dialog?.mode === 'edit' ? 'Edit view' : 'Save view'}
+        onClose={() => setDialog(null)}
+        footer={
+          <>
+            {dialog?.mode === 'edit' && (
+              <Ui.Button variant="danger" onClick={() => void remove(dialog.view)} disabled={busy}>
+                Delete
+              </Ui.Button>
+            )}
+            <Ui.Button data-dialog-close="">Cancel</Ui.Button>
+            <Ui.Button variant="primary" type="submit" form="view-form" busy={busy} disabled={!name.trim()}>
+              Save
+            </Ui.Button>
+          </>
+        }
+      >
+        {dialog && (
+          <Ui.Form
+            id="view-form"
+            className="t-stack"
             onSubmit={(e) => {
               e.preventDefault();
               void submitDialog();
             }}
           >
-            <FormControl required>
-              <FormControl.Label>Name</FormControl.Label>
-              <TextInput block value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-            </FormControl>
-            <FormControl>
-              <FormControl.Label>Search</FormControl.Label>
-              <TextInput block monospace value={viewQuery} onChange={(e) => setViewQuery(e.target.value)} />
-              <FormControl.Caption>
-                {dialog.mode === 'edit' && viewQuery !== query && (
-                  <Button variant="link" size="small" onClick={() => setViewQuery(query)}>
+            <Ui.Field label="Name">
+              <Ui.Input required value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </Ui.Field>
+            <Ui.Field
+              label="Search"
+              hint={
+                dialog.mode === 'edit' && viewQuery !== query ? (
+                  <Ui.Button variant="link" size="xs" onClick={() => setViewQuery(query)}>
                     Use the current search
-                  </Button>
-                )}
-                {(dialog.mode === 'create' || viewQuery === query) &&
-                  'Qualifiers like is:open repo:owner/name label:bug.'}
-              </FormControl.Caption>
-            </FormControl>
-          </form>
-        </Dialog>
-      )}
-    </aside>
+                  </Ui.Button>
+                ) : (
+                  'Qualifiers like is:open repo:owner/name label:bug.'
+                )
+              }
+            >
+              <Ui.Input className="t-mono" value={viewQuery} onChange={(e) => setViewQuery(e.target.value)} />
+            </Ui.Field>
+          </Ui.Form>
+        )}
+      </Ui.Dialog>
+    </div>
   );
 }

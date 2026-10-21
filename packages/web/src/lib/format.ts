@@ -26,7 +26,7 @@ export function absoluteTime(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-/** "maziggy commented 2h ago" / "maziggy opened 3d ago" / "updated 1d ago". */
+/** "acme-dev commented 2h ago" / "acme-dev opened 3d ago" / "updated 1d ago". */
 export function activityLine(
   item: { lastActivityBy: string | null; lastActivityAt: string; commentCount: number },
   now: Date = new Date(),

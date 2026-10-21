@@ -1,5 +1,3 @@
-import { SearchIcon, XIcon } from '@primer/octicons-react';
-import { ActionList, TextInput } from '@primer/react';
 import {
   forwardRef,
   type KeyboardEvent,
@@ -11,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Ui } from 'tailor-react';
 import { applySuggestion, type SuggestContext, suggest } from '../lib/search';
 
 export interface SearchBarHandle {
@@ -90,62 +89,69 @@ export const SearchBar = forwardRef<SearchBarHandle, Props>(function SearchBar(
 
   return (
     <div className="searchbar">
-      <TextInput
-        ref={inputRef}
-        block
-        size="medium"
-        leadingVisual={SearchIcon}
-        aria-label="Search items"
-        role="combobox"
-        aria-expanded={open && items.length > 0}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        placeholder="Search or filter, e.g. is:open type:pr repo:owner/name label:bug"
-        value={draft}
-        autoComplete="off"
-        spellCheck={false}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          setActive(-1);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        onKeyDown={onKeyDown}
-        trailingAction={
-          draft ? (
-            <TextInput.Action
-              onClick={() => {
-                setDraft('');
-                onSubmit('');
-                inputRef.current?.focus();
-              }}
-              icon={XIcon}
-              aria-label="Clear search"
-            />
-          ) : undefined
-        }
-      />
+      <Ui.InputGroup className="searchbar-group">
+        <Ui.InputAddon>
+          <Ui.Icon name="bi-search" />
+        </Ui.InputAddon>
+        <Ui.Input
+          ref={inputRef}
+          aria-label="Search items"
+          role="combobox"
+          aria-expanded={open && items.length > 0}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
+          placeholder="Search or filter, e.g. is:open type:pr repo:owner/name label:bug"
+          value={draft}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setActive(-1);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onKeyDown={onKeyDown}
+        />
+        {draft && (
+          <Ui.Button
+            variant="ghost"
+            iconOnly
+            aria-label="Clear search"
+            tip="Clear search"
+            onClick={() => {
+              setDraft('');
+              onSubmit('');
+              inputRef.current?.focus();
+            }}
+          >
+            <Ui.Icon name="bi-x-lg" />
+          </Ui.Button>
+        )}
+      </Ui.InputGroup>
       {open && items.length > 0 && (
-        <div className="searchbar-menu">
-          <ActionList id={listId} role="listbox" aria-label="Search suggestions" showDividers={false}>
-            {items.map((s, i) => (
-              <ActionList.Item
-                key={s.insert}
+        // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: tailor's listbox markup (ul.t-menu-list[role=listbox]), as the drawn select uses it.
+        <ul className="t-menu-list searchbar-menu" id={listId} role="listbox" aria-label="Search suggestions">
+          {items.map((s, i) => (
+            <li key={s.insert}>
+              <button
+                type="button"
+                className="t-menu-item"
                 role="option"
-                active={i === active}
+                id={`${listId}-${i}`}
+                tabIndex={-1}
                 aria-selected={i === active}
-                onSelect={() => accept(i)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => accept(i)}
                 onMouseEnter={() => setActive(i)}
               >
                 <code className="searchbar-suggestion">{s.label}</code>
-                {s.description && (
-                  <ActionList.Description variant="block">{s.description}</ActionList.Description>
-                )}
-              </ActionList.Item>
-            ))}
-          </ActionList>
-        </div>
+                {s.description && <Ui.Menu.Desc>{s.description}</Ui.Menu.Desc>}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

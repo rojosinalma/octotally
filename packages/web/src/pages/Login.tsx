@@ -1,17 +1,16 @@
-import { Button, FormControl, Heading, TextInput } from '@primer/react';
 import { type FormEvent, useState } from 'react';
+import { Ui } from 'tailor-react';
 import { api } from '../api';
 
 export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!password) return;
     setBusy(true);
-    setError(null);
+    setError(undefined);
     try {
       await api.login(password);
       onLoggedIn();
@@ -24,28 +23,29 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <main className="login-page">
-      <form className="login-card" onSubmit={(e) => void submit(e)}>
-        <Heading as="h1" className="login-title">
-          Octotally
-        </Heading>
-        <p className="fg-muted">Enter the password configured for this instance.</p>
-        <FormControl required>
-          <FormControl.Label>Password</FormControl.Label>
-          <TextInput
-            block
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            validationStatus={error ? 'error' : undefined}
-            autoFocus
-          />
-          {error && <FormControl.Validation variant="error">{error}</FormControl.Validation>}
-        </FormControl>
-        <Button type="submit" variant="primary" block disabled={busy || !password}>
-          {busy ? 'Signing in…' : 'Sign in'}
-        </Button>
-      </form>
+      <Ui.Card className="login-card">
+        <Ui.Card.Body>
+          <Ui.Form onSubmit={(e) => void submit(e)} className="t-stack">
+            <h1 className="t-page-title login-title">
+              <img src="/favicon.svg" alt="" width={28} height={28} /> Octotally
+            </h1>
+            <p className="t-muted">Enter the password configured for this instance.</p>
+            <Ui.Field label="Password" error={error}>
+              <Ui.Input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoFocus
+              />
+            </Ui.Field>
+            <Ui.Button type="submit" variant="primary" busy={busy}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </Ui.Button>
+          </Ui.Form>
+        </Ui.Card.Body>
+      </Ui.Card>
     </main>
   );
 }

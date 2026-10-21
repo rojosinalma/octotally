@@ -77,21 +77,11 @@ export type Activity = z.infer<typeof Activity>;
 // Settings (settings table; every tunable lives here, never as a constant)
 // ---------------------------------------------------------------------------
 
-export const Theme = z.enum([
-  'auto',
-  'light',
-  'light_colorblind',
-  'light_tritanopia',
-  'light_high_contrast',
-  'dark',
-  'dark_dimmed',
-  'dark_colorblind',
-  'dark_tritanopia',
-  'dark_high_contrast',
-  /** Community theme generated from Primer's dark tokens (packages/web/src/themes); dark themes must contain "dark" in the name for Primer React.. */
-  'dark_dracula',
-]);
-export type Theme = z.infer<typeof Theme>;
+/** Tailor skin/palette ids: the client ignores ids it does not ship, so no enum here. */
+const TailorId = z
+  .string()
+  .max(40)
+  .regex(/^[a-z0-9-]+$/);
 
 export const Settings = z.object({
   /** "Active" = activity within this many days. */
@@ -108,7 +98,12 @@ export const Settings = z.object({
   /** Timezone for digestHour (IANA). */
   timezone: z.string().default('UTC'),
   discordWebhookUrl: z.string().url().startsWith('https://').or(z.literal('')).default(''),
-  theme: Theme.default('auto'),
+  /** Tailor skin id. */
+  skin: TailorId.default('primer'),
+  /** Tailor palette id. */
+  palette: TailorId.default('ayu'),
+  /** Colour mode; `auto` follows the OS. */
+  mode: z.enum(['auto', 'dark', 'light']).default('auto'),
   /** Id of the view shown on load. */
   defaultView: z.string().default('active'),
   /** Octoforge app switcher: hide the list once its `updated_at` is older (3 × Octoforge's resend period). */

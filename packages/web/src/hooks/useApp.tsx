@@ -5,11 +5,22 @@ import { type ApiError, api } from '../api';
 import { useAsync, useInterval } from './useAsync';
 import { useToast } from './useToast';
 
+export interface SaveOutcome {
+  ok: boolean;
+  message: string;
+}
+
 export interface AppState {
   settings: Settings;
   settingsLoaded: boolean;
-  /** Optimistic patch; reverts and toasts on failure. Resolves true on success. */
-  updateSettings: (patch: SettingsPatch, opts?: { silent?: boolean }) => Promise<boolean>;
+  /**
+   * Optimistic patch; reverts on failure. Toasts the outcome unless `silent` (no success toast) or
+   * `quiet` (no toast at all: the caller reports it, e.g. a settings row).
+   */
+  updateSettings: (
+    patch: SettingsPatch,
+    opts?: { silent?: boolean; quiet?: boolean },
+  ) => Promise<SaveOutcome>;
   status: SyncStatus | null;
   statusError: ApiError | null;
   reloadStatus: () => Promise<void>;
@@ -68,12 +79,13 @@ export function AppProvider({
       try {
         const r = await api.patchSettings(patch);
         setSettings(r.settings);
-        if (!opts.silent) toast('Settings saved');
-        return true;
+        if (!opts.silent && !opts.quiet) toast('Settings saved');
+        return { ok: true, message: 'Saved' };
       } catch (e) {
         setSettings(previous);
-        toast('Settings not saved', { description: (e as Error).message, variant: 'critical' });
-        return false;
+        const reason = (e as Error).message;
+        if (!opts.quiet) toast('Settings not saved', { description: reason, variant: 'critical' });
+        return { ok: false, message: `Not saved: ${reason}` };
       }
     },
     [toast],
