@@ -1,10 +1,9 @@
 import type { Activity, Hidden, Item } from '@octotally/shared';
 import { Item as ItemSchema } from '@octotally/shared';
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
-import type { Db } from '../db';
-import { activity as activityTable, items as itemsTable } from '../db/schema';
+import { count, desc, eq, gt } from 'drizzle-orm';
+import type { Db, schema } from '../db';
 
-type ItemRow = typeof itemsTable.$inferSelect;
+type ItemRow = typeof schema.items.$inferSelect;
 
 export function rowToItem(r: ItemRow): Item {
   return ItemSchema.parse({
@@ -14,43 +13,40 @@ export function rowToItem(r: ItemRow): Item {
   });
 }
 
-export function listItems(db: Db): Item[] {
-  return db.select().from(itemsTable).all().map(rowToItem);
+export async function listItems(db: Db): Promise<Item[]> {
+  const rows = await db.orm.select().from(db.t.items);
+  return rows.map(rowToItem);
 }
 
-export function getItem(db: Db, id: string): Item | null {
-  const r = db.select().from(itemsTable).where(eq(itemsTable.id, id)).get();
+export async function getItem(db: Db, id: string): Promise<Item | null> {
+  const [r] = await db.orm.select().from(db.t.items).where(eq(db.t.items.id, id)).limit(1);
   return r ? rowToItem(r) : null;
 }
 
-export function countItems(db: Db): number {
-  return db.select({ n: sql<number>`count(*)` }).from(itemsTable).get()?.n ?? 0;
+export async function countItems(db: Db): Promise<number> {
+  const [r] = await db.orm.select({ n: count() }).from(db.t.items);
+  return r?.n ?? 0;
 }
 
-export function listActivity(db: Db, itemId: string, limit = 100): Activity[] {
-  return db
-    .select()
-    .from(activityTable)
-    .where(eq(activityTable.itemId, itemId))
-    .orderBy(desc(activityTable.at))
-    .limit(limit)
-    .all()
-    .map(rowToActivity);
+export async function listActivity(db: Db, itemId: string, limit = 100): Promise<Activity[]> {
+  const t = db.t.activity;
+  const rows = await db.orm.select().from(t).where(eq(t.itemId, itemId)).orderBy(desc(t.at)).limit(limit);
+  return rows.map(rowToActivity);
 }
 
 /** Activity the tracker noticed after `sinceSeenAt` (ISO), newest first, bounded. */
-export function listActivitySince(db: Db, sinceSeenAt: string, limit = 500): Activity[] {
-  return db
+export async function listActivitySince(db: Db, sinceSeenAt: string, limit = 500): Promise<Activity[]> {
+  const t = db.t.activity;
+  const rows = await db.orm
     .select()
-    .from(activityTable)
-    .where(gt(activityTable.seenAt, sinceSeenAt))
-    .orderBy(desc(activityTable.at))
-    .limit(limit)
-    .all()
-    .map(rowToActivity);
+    .from(t)
+    .where(gt(t.seenAt, sinceSeenAt))
+    .orderBy(desc(t.at))
+    .limit(limit);
+  return rows.map(rowToActivity);
 }
 
-function rowToActivity(r: typeof activityTable.$inferSelect): Activity {
+function rowToActivity(r: typeof schema.activity.$inferSelect): Activity {
   return {
     id: r.id,
     itemId: r.itemId,
@@ -63,27 +59,28 @@ function rowToActivity(r: typeof activityTable.$inferSelect): Activity {
 }
 
 /** mute / done / restore. Mute records the current activity point so later activity un-mutes. */
-export function setHidden(db: Db, id: string, hidden: Hidden, now = new Date()): Item | null {
-  const current = getItem(db, id);
+export async function setHidden(db: Db, id: string, hidden: Hidden, now = new Date()): Promise<Item | null> {
+  const current = await getItem(db, id);
   if (!current) return null;
   const iso = now.toISOString();
-  db.update(itemsTable)
+  await db.orm
+    .update(db.t.items)
     .set({
       hidden,
       hiddenAt: hidden === 'none' ? null : iso,
       mutedActivityAt: hidden === 'muted' ? current.lastActivityAt : null,
     })
-    .where(eq(itemsTable.id, id))
-    .run();
+    .where(eq(db.t.items.id, id));
   return getItem(db, id);
 }
 
-export function repoCounts(db: Db): { repo: string; count: number }[] {
-  return db
-    .select({ repo: itemsTable.repo, count: sql<number>`count(*)` })
-    .from(itemsTable)
-    .where(and(eq(itemsTable.hidden, 'none')))
-    .groupBy(itemsTable.repo)
-    .orderBy(desc(sql`count(*)`), itemsTable.repo)
-    .all();
+export async function repoCounts(db: Db): Promise<{ repo: string; count: number }[]> {
+  const t = db.t.items;
+  const n = count();
+  return db.orm
+    .select({ repo: t.repo, count: n })
+    .from(t)
+    .where(eq(t.hidden, 'none'))
+    .groupBy(t.repo)
+    .orderBy(desc(n), t.repo);
 }

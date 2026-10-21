@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_SETTINGS } from '@octotally/shared';
+import type { Db } from '../src/db';
 import { getItem, listActivity, listItems, setHidden } from '../src/lib/items';
 import { patchSettings } from '../src/lib/settings';
 import { Syncer } from '../src/lib/sync';
@@ -9,11 +10,7 @@ import { fakeGitHub, memDb, must, noSleep } from './helpers';
 
 const ISSUE = 'I_kwDOAbCdEf5xyz001';
 
-function syncer(
-  db: ReturnType<typeof memDb>['db'],
-  overrides: Record<string, unknown> = {},
-  token: string | null = 't',
-) {
+function syncer(db: Db, overrides: Record<string, unknown> = {}, token: string | null = 't') {
   return new Syncer({
     db,
     tokens: new StaticToken(token),
@@ -42,32 +39,32 @@ function withNewComment(at: string, by = 'maintainer') {
 
 describe('Syncer', () => {
   test('no token → skipped with a clear error, no run recorded', async () => {
-    const h = memDb();
+    const h = await memDb();
     const s = syncer(h.db, {}, null);
     const out = await s.run();
     expect(out).toMatchObject({ ok: false, skipped: 'no_token' });
     expect(out.error).toMatch(/no token/);
-    expect(s.status(null)).toMatchObject({
+    expect(await s.status(null)).toMatchObject({
       githubLogin: null,
       lastSyncAt: null,
       itemCount: 0,
     });
-    expect(s.status(null).lastError).toMatch(/no token/);
+    expect((await s.status(null)).lastError).toMatch(/no token/);
   });
 
   test('first sync imports items with roles, no activity rows', async () => {
-    const h = memDb();
+    const h = await memDb();
     const s = syncer(h.db);
     const out = await s.run();
     expect(out.ok).toBe(true);
     expect(out.counts).toMatchObject({ added: 4, updated: 0, issues: 2, prs: 1, discussions: 1 });
-    const items = listItems(h.db);
+    const items = await listItems(h.db);
     expect(items).toHaveLength(4);
-    const issue = must(getItem(h.db, ISSUE));
+    const issue = must(await getItem(h.db, ISSUE));
     expect(issue.roles).toEqual(['author', 'commenter']);
     expect(issue.hidden).toBe('none');
-    expect(listActivity(h.db, ISSUE)).toHaveLength(0);
-    const st = s.status('2026-10-13T12:15:00.000Z');
+    expect(await listActivity(h.db, ISSUE)).toHaveLength(0);
+    const st = await s.status('2026-10-13T12:15:00.000Z');
     expect(st).toMatchObject({
       githubLogin: 'octocat',
       lastSyncOk: true,
@@ -78,9 +75,9 @@ describe('Syncer', () => {
   });
 
   test('second sync with a new comment appends activity and preserves local state', async () => {
-    const h = memDb();
+    const h = await memDb();
     await syncer(h.db).run();
-    setHidden(h.db, ISSUE, 'done');
+    await setHidden(h.db, ISSUE, 'done');
     const out = await syncer(h.db, withNewComment('2026-10-13T08:00:00Z')).run();
     expect(out.newActivity).toHaveLength(1);
     expect(out.newActivity[0]).toMatchObject({
@@ -89,51 +86,51 @@ describe('Syncer', () => {
       actor: 'maintainer',
       summary: 'maintainer commented',
     });
-    const issue = must(getItem(h.db, ISSUE));
+    const issue = must(await getItem(h.db, ISSUE));
     expect(issue.hidden).toBe('done'); // done is sticky
     expect(issue.lastActivityAt).toBe('2026-10-13T08:00:00.000Z');
     expect(issue.commentCount).toBe(5);
-    expect(listActivity(h.db, ISSUE)).toHaveLength(1);
+    expect(await listActivity(h.db, ISSUE)).toHaveLength(1);
   });
 
   test('muted item is auto-unmuted by newer activity, not by a re-sync of the same state', async () => {
-    const h = memDb();
+    const h = await memDb();
     await syncer(h.db).run();
-    setHidden(h.db, ISSUE, 'muted');
+    await setHidden(h.db, ISSUE, 'muted');
     await syncer(h.db).run();
-    expect(must(getItem(h.db, ISSUE)).hidden).toBe('muted');
+    expect(must(await getItem(h.db, ISSUE)).hidden).toBe('muted');
     const out = await syncer(h.db, withNewComment('2026-10-13T08:00:00Z')).run();
     expect(out.counts.unmuted).toBe(1);
-    const issue = must(getItem(h.db, ISSUE));
+    const issue = must(await getItem(h.db, ISSUE));
     expect(issue.hidden).toBe('none');
     expect(issue.mutedActivityAt).toBeNull();
   });
 
   test('state change produces a state activity', async () => {
-    const h = memDb();
+    const h = await memDb();
     await syncer(h.db).run();
     const page = structuredClone(issuesPage);
     (page.data.search.nodes[0] as { state: string; updatedAt: string }).state = 'CLOSED';
     (page.data.search.nodes[0] as { state: string; updatedAt: string }).updatedAt = '2026-10-13T09:00:00Z';
     const out = await syncer(h.db, { InvolvedIssues: page }).run();
     expect(out.newActivity[0]).toMatchObject({ kind: 'state', summary: 'Closed' });
-    expect(must(getItem(h.db, ISSUE)).state).toBe('closed');
+    expect(must(await getItem(h.db, ISSUE)).state).toBe('closed');
   });
 
   test('activity is capped at settings.activityKeep', async () => {
-    const h = memDb();
-    patchSettings(h.db, { activityKeep: 2 });
+    const h = await memDb();
+    await patchSettings(h.db, { activityKeep: 2 });
     await syncer(h.db).run();
     for (let i = 1; i <= 4; i += 1) {
       await syncer(h.db, withNewComment(`2026-10-13T0${i}:00:00Z`)).run();
     }
-    const acts = listActivity(h.db, ISSUE);
+    const acts = await listActivity(h.db, ISSUE);
     expect(acts).toHaveLength(2);
     expect(acts[0]?.at).toBe('2026-10-13T04:00:00.000Z');
   });
 
   test('new item on a later sync yields a "New" activity', async () => {
-    const h = memDb();
+    const h = await memDb();
     await syncer(h.db).run();
     const page = structuredClone(issuesPage);
     const extra = structuredClone(page.data.search.nodes[0]) as { id: string; number: number; title: string };
@@ -147,15 +144,15 @@ describe('Syncer', () => {
   });
 
   test('coalesces concurrent runs', async () => {
-    const h = memDb();
+    const h = await memDb();
     const s = syncer(h.db);
     const [a, b] = await Promise.all([s.run(), s.run()]);
     expect([a.skipped, b.skipped].filter((x) => x === 'running')).toHaveLength(1);
-    expect(listItems(h.db)).toHaveLength(4);
+    expect(await listItems(h.db)).toHaveLength(4);
   });
 
   test('failure increments backoff and records the error; success resets', async () => {
-    const h = memDb();
+    const h = await memDb();
     const bad = new Syncer({
       db: h.db,
       tokens: new StaticToken('t'),
@@ -171,8 +168,8 @@ describe('Syncer', () => {
     expect(bad.nextDelayMin({ ...DEFAULT_SETTINGS, pollIntervalMin: 15, backoffMaxMin: 120 })).toBe(30);
     await bad.run();
     expect(bad.nextDelayMin({ ...DEFAULT_SETTINGS, pollIntervalMin: 15, backoffMaxMin: 50 })).toBe(50);
-    expect(bad.status(null)).toMatchObject({ lastSyncOk: false });
-    expect(bad.status(null).lastError).toMatch(/rejected the token/);
+    expect(await bad.status(null)).toMatchObject({ lastSyncOk: false });
+    expect((await bad.status(null)).lastError).toMatch(/rejected the token/);
 
     const good = syncer(h.db);
     await good.run();

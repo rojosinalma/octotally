@@ -1,7 +1,6 @@
 import type { Activity, Role, Settings, SyncStatus } from '@octotally/shared';
-import { desc, eq, lt, sql } from 'drizzle-orm';
-import type { Db } from '../db';
-import { activity as activityTable, items as itemsTable, syncRuns } from '../db/schema';
+import { and, desc, eq, isNotNull, lt } from 'drizzle-orm';
+import type { Db, schema } from '../db';
 import { errInfo, log } from '../log';
 import { GitHubClient, GitHubError, type GraphQLOptions, type RateLimit } from './github/client';
 import { fetchSnapshot, type Snapshot } from './github/fetch';
@@ -91,7 +90,10 @@ export class Syncer {
         return { ok: false, skipped: 'rate_budget', error: msg, newActivity: [], counts: {} };
       }
 
-      const runId = this.db.insert(syncRuns).values({ startedAt }).returning({ id: syncRuns.id }).get().id;
+      const syncRuns = this.db.t.syncRuns;
+      const [run] = await this.db.orm.insert(syncRuns).values({ startedAt }).returning({ id: syncRuns.id });
+      if (!run) throw new Error('sync_runs insert returned no id');
+      const runId = run.id;
       const gh = new GitHubClient(token, this.clientOptions);
       const costBefore = gh.lastRateLimit;
       try {
@@ -99,11 +101,11 @@ export class Syncer {
         this.lastRateLimit = gh.lastRateLimit;
         this.lastSyncCost =
           costBefore && gh.lastRateLimit ? Math.max(0, costBefore.remaining - gh.lastRateLimit.remaining) : 0;
-        const settings = getSettings(this.db);
-        const result = this.persist(snapshot, settings);
+        const settings = await getSettings(this.db);
+        const result = await this.persist(snapshot, settings);
         this.failures = 0;
         const counts = { ...snapshot.counts, ...result.counts };
-        this.db
+        await this.db.orm
           .update(syncRuns)
           .set({
             finishedAt: this.now().toISOString(),
@@ -113,8 +115,7 @@ export class Syncer {
             rateResetAt: this.lastRateLimit?.resetAt ?? null,
             counts,
           })
-          .where(eq(syncRuns.id, runId))
-          .run();
+          .where(eq(syncRuns.id, runId));
         this.logger.info(
           { login: snapshot.login, ...counts, newActivity: result.newActivity.length },
           'sync ok',
@@ -124,7 +125,7 @@ export class Syncer {
         this.lastRateLimit = gh.lastRateLimit ?? this.lastRateLimit;
         this.failures += 1;
         const message = describeError(err);
-        this.db
+        await this.db.orm
           .update(syncRuns)
           .set({
             finishedAt: this.now().toISOString(),
@@ -133,8 +134,7 @@ export class Syncer {
             rateRemaining: this.lastRateLimit?.remaining ?? null,
             rateResetAt: this.lastRateLimit?.resetAt ?? null,
           })
-          .where(eq(syncRuns.id, runId))
-          .run();
+          .where(eq(syncRuns.id, runId));
         this.logger.error({ err: errInfo(err), failures: this.failures }, 'sync failed');
         return { ok: false, error: message, newActivity: [], counts: {} };
       }
@@ -152,31 +152,32 @@ export class Syncer {
   }
 
   /** Writes a snapshot in one transaction; returns the activity rows added. */
-  private persist(
+  private async persist(
     snapshot: Snapshot,
     settings: Settings,
-  ): { newActivity: Activity[]; counts: Record<string, number> } {
+  ): Promise<{ newActivity: Activity[]; counts: Record<string, number> }> {
     const nowIso = this.now().toISOString();
     const newActivity: Activity[] = [];
     let added = 0;
     let updated = 0;
     let unmuted = 0;
-    const hadItems = countItems(this.db) > 0;
+    const hadItems = (await countItems(this.db)) > 0;
 
-    this.db.transaction((tx) => {
+    await this.db.transaction(async (tx) => {
+      const itemsTable = tx.t.items;
       for (const remote of snapshot.items) {
         const roles = [...(snapshot.roles.get(remote.id) ?? new Set<Role>())].sort();
-        const stored = tx.select().from(itemsTable).where(eq(itemsTable.id, remote.id)).get();
+        const [stored] = await tx.orm.select().from(itemsTable).where(eq(itemsTable.id, remote.id)).limit(1);
         const { lastEvent, ...fields } = remote;
 
         if (!stored) {
-          tx.insert(itemsTable)
-            .values({ ...fields, roles, hidden: 'none', firstSeenAt: nowIso, lastSyncedAt: nowIso })
-            .run();
+          await tx.orm
+            .insert(itemsTable)
+            .values({ ...fields, roles, hidden: 'none', firstSeenAt: nowIso, lastSyncedAt: nowIso });
           added += 1;
           if (hadItems) {
             newActivity.push(
-              this.addActivity(tx, {
+              await this.addActivity(tx, {
                 itemId: remote.id,
                 kind: 'other',
                 actor: remote.lastActivityBy,
@@ -191,16 +192,14 @@ export class Syncer {
         }
 
         const act = detectActivity(stored, remote);
-        if (act) newActivity.push(this.addActivity(tx, { ...act, itemId: remote.id, seenAt: nowIso }));
+        if (act) newActivity.push(await this.addActivity(tx, { ...act, itemId: remote.id, seenAt: nowIso }));
 
-        const merged = {
-          ...fields,
-          roles,
-          hidden: stored.hidden,
-          hiddenAt: stored.hiddenAt,
-          mutedActivityAt: stored.mutedActivityAt,
-          lastSyncedAt: nowIso,
-        };
+        // Local state (hidden, hiddenAt, mutedActivityAt) is only written by an auto-unmute, and then only
+        // while the row is still muted: a mute/done the user sets during the sync is never overwritten.
+        await tx.orm
+          .update(itemsTable)
+          .set({ ...fields, roles, lastSyncedAt: nowIso })
+          .where(eq(itemsTable.id, remote.id));
         if (
           shouldAutoUnmute({
             hidden: stored.hidden as 'muted',
@@ -208,54 +207,56 @@ export class Syncer {
             lastActivityAt: remote.lastActivityAt,
           })
         ) {
-          merged.hidden = 'none';
-          merged.hiddenAt = null;
-          merged.mutedActivityAt = null;
+          await tx.orm
+            .update(itemsTable)
+            .set({ hidden: 'none', hiddenAt: null, mutedActivityAt: null })
+            .where(and(eq(itemsTable.id, remote.id), eq(itemsTable.hidden, 'muted')));
           unmuted += 1;
         }
-        tx.update(itemsTable).set(merged).where(eq(itemsTable.id, remote.id)).run();
         updated += 1;
-        if (act) this.capActivity(tx, remote.id, settings.activityKeep);
+        if (act) await this.capActivity(tx, remote.id, settings.activityKeep);
       }
     });
     return { newActivity, counts: { added, updated, unmuted } };
   }
 
-  private addActivity(tx: Tx, a: Omit<Activity, 'id'> & { seenAt: string }): Activity {
+  private async addActivity(tx: Db, a: Omit<Activity, 'id'> & { seenAt: string }): Promise<Activity> {
     const id = `${a.itemId}:${a.kind}:${a.at}`;
-    tx.insert(activityTable)
+    await tx.orm
+      .insert(tx.t.activity)
       .values({ id, ...a })
-      .onConflictDoNothing()
-      .run();
+      .onConflictDoNothing();
     return { id, itemId: a.itemId, kind: a.kind, actor: a.actor, summary: a.summary, url: a.url, at: a.at };
   }
 
-  private capActivity(tx: Tx, itemId: string, keep: number) {
-    const cutoff = tx
+  private async capActivity(tx: Db, itemId: string, keep: number) {
+    const activityTable = tx.t.activity;
+    const [cutoff] = await tx.orm
       .select({ at: activityTable.at })
       .from(activityTable)
       .where(eq(activityTable.itemId, itemId))
       .orderBy(desc(activityTable.at))
       .limit(1)
-      .offset(keep - 1)
-      .get();
+      .offset(keep - 1);
     if (!cutoff) return;
-    tx.delete(activityTable)
-      .where(sql`${activityTable.itemId} = ${itemId} AND ${lt(activityTable.at, cutoff.at)}`)
-      .run();
+    await tx.orm
+      .delete(activityTable)
+      .where(and(eq(activityTable.itemId, itemId), lt(activityTable.at, cutoff.at)));
   }
 
-  status(nextSyncAt: string | null): SyncStatus {
-    const last = this.db.select().from(syncRuns).orderBy(desc(syncRuns.id)).limit(1).get();
+  async status(nextSyncAt: string | null): Promise<SyncStatus> {
+    const syncRuns = this.db.t.syncRuns;
+    const [last] = await this.db.orm.select().from(syncRuns).orderBy(desc(syncRuns.id)).limit(1);
     const lastOkLogin =
       last?.githubLogin ??
-      this.db
-        .select({ l: syncRuns.githubLogin })
-        .from(syncRuns)
-        .where(sql`${syncRuns.githubLogin} IS NOT NULL`)
-        .orderBy(desc(syncRuns.id))
-        .limit(1)
-        .get()?.l ??
+      (
+        await this.db.orm
+          .select({ l: syncRuns.githubLogin })
+          .from(syncRuns)
+          .where(isNotNull(syncRuns.githubLogin))
+          .orderBy(desc(syncRuns.id))
+          .limit(1)
+      )[0]?.l ??
       null;
     return {
       lastSyncAt: last?.finishedAt ?? null,
@@ -266,7 +267,7 @@ export class Syncer {
       githubLogin: lastOkLogin,
       githubRateRemaining: this.lastRateLimit?.remaining ?? last?.rateRemaining ?? null,
       githubRateResetAt: this.lastRateLimit?.resetAt ?? last?.rateResetAt ?? null,
-      itemCount: countItems(this.db),
+      itemCount: await countItems(this.db),
     };
   }
 
@@ -276,9 +277,7 @@ export class Syncer {
   }
 }
 
-type StoredRow = typeof itemsTable.$inferSelect;
-/** A db handle or the transaction inside `db.transaction()`. */
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type StoredRow = typeof schema.items.$inferSelect;
 
 /** Which activity, if any, the new snapshot carries for a known item. */
 export function detectActivity(

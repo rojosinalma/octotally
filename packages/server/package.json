@@ -8,13 +8,14 @@
     "start": "bun src/index.ts",
     "build": "echo server: runs from source under bun",
     "typecheck": "tsc -p tsconfig.json",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate --config drizzle.sqlite.config.ts && drizzle-kit generate --config drizzle.postgres.config.ts && bun scripts/unqualify.ts"
   },
   "dependencies": {
     "@octotally/shared": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.13",
     "pino": "10.4.0",
+    "postgres": "3.4.9",
     "zod": "4.6.7"
   },
   "devDependencies": {

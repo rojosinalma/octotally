@@ -1,4 +1,5 @@
 import type { Item } from '@octotally/shared';
+import postgres from 'postgres';
 import { type DbHandle, openDb } from '../src/db';
 import { seedViews } from '../src/lib/settings';
 import { configureLog } from '../src/log';
@@ -9,9 +10,64 @@ import viewer from './fixtures/viewer.json';
 
 configureLog('silent');
 
-export function memDb(): DbHandle {
-  const h = openDb(':memory:');
-  seedViews(h.db);
+/**
+ * Postgres for tests: `TEST_DATABASE_URL` (bin/verify starts a throwaway container, CI a service).
+ * Missing → null, so the Postgres-only tests skip with a message; on CI a missing URL is an error,
+ * so they can never be skipped silently there.
+ */
+export function pgUrl(): string | null {
+  const url = process.env.TEST_DATABASE_URL || null;
+  if (!url && process.env.CI)
+    throw new Error('TEST_DATABASE_URL must be set on CI: the Postgres tests may not skip');
+  return url;
+}
+
+/** Engine the shared-layer tests run on: `TEST_DB_ENGINE=postgres` switches every `memDb()` to Postgres. */
+export const TEST_ENGINE = process.env.TEST_DB_ENGINE === 'postgres' ? 'postgres' : 'sqlite';
+
+let schemaSeq = 0;
+/** A fresh, unused schema name for this process. */
+export function testSchema(prefix = 't'): string {
+  schemaSeq += 1;
+  return `${prefix}_${process.pid}_${Date.now().toString(36)}_${schemaSeq}`;
+}
+
+const open: { h: DbHandle; schema: string | null }[] = [];
+
+/** Closes every handle `freshDb`/`memDb` opened and drops their Postgres schemas (test/setup.ts, afterEach). */
+export async function closeTestDbs(): Promise<void> {
+  const list = open.splice(0);
+  for (const { h } of list) await h.close();
+  const schemas = list.map((x) => x.schema).filter((x): x is string => x !== null);
+  const url = schemas.length ? pgUrl() : null;
+  if (!url) return;
+  const admin = postgres(url, { onnotice: () => {}, max: 1 });
+  try {
+    for (const schema of schemas) await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+  } finally {
+    await admin.end({ timeout: 5 });
+  }
+}
+
+/** Keeps a handle for closeTestDbs; `schema` is a Postgres schema to drop afterwards. */
+export function track(h: DbHandle, schema: string | null = null): DbHandle {
+  open.push({ h, schema });
+  return h;
+}
+
+/** An empty, migrated database on `engine` (fresh schema on Postgres), closed after the test. */
+export async function freshDb(engine: 'sqlite' | 'postgres' = TEST_ENGINE): Promise<DbHandle> {
+  if (engine === 'sqlite') return track(await openDb(':memory:'));
+  const url = pgUrl();
+  if (!url) throw new Error('TEST_DB_ENGINE=postgres needs TEST_DATABASE_URL');
+  const schema = testSchema();
+  return track(await openDb({ engine: 'postgres', url, schema, source: 'env' }), schema);
+}
+
+/** The database most tests use: fresh, with the built-in views seeded like at start-up. */
+export async function memDb(): Promise<DbHandle> {
+  const h = await freshDb();
+  await seedViews(h.db);
   return h;
 }
 

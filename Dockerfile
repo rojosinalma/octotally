@@ -62,7 +62,6 @@ COPY --chown=octotally:octotally packages/shared/package.json packages/shared/
 COPY --chown=octotally:octotally packages/shared/src packages/shared/src
 COPY --chown=octotally:octotally packages/server/package.json packages/server/
 COPY --chown=octotally:octotally packages/server/src packages/server/src
-COPY --chown=octotally:octotally packages/server/drizzle packages/server/drizzle
 COPY --from=build --chown=octotally:octotally /app/packages/web/dist packages/web/dist
 
 USER octotally

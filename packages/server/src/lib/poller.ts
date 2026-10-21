@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS, type Settings } from '@octotally/shared';
 import type { Db } from '../db';
 import { errInfo, log } from '../log';
 import { buildDailyDigest, buildRealtimeDigest, dailyDue, dispatchDigest, lastDigestAt } from './digest';
@@ -44,15 +45,15 @@ export class Poller {
     try {
       const outcome = await this.syncer.run();
       if (outcome.skipped === 'running') return;
-      const settings = getSettings(this.db);
+      const settings = await getSettings(this.db);
       if (outcome.ok && settings.digestRealtime && outcome.newActivity.length) {
-        const msg = buildRealtimeDigest(this.db, outcome.newActivity);
+        const msg = await buildRealtimeDigest(this.db, outcome.newActivity);
         if (msg) await dispatchDigest(this.db, settings, msg, this.now());
       }
-      if (dailyDue(this.db, settings, this.now())) {
+      if (await dailyDue(this.db, settings, this.now())) {
         const since =
-          lastDigestAt(this.db, 'daily') ?? new Date(this.now().getTime() - 86_400_000).toISOString();
-        const msg = buildDailyDigest(this.db, settings, since, this.now());
+          (await lastDigestAt(this.db, 'daily')) ?? new Date(this.now().getTime() - 86_400_000).toISOString();
+        const msg = await buildDailyDigest(this.db, settings, since, this.now());
         if (msg) await dispatchDigest(this.db, settings, msg, this.now());
         else this.logger.info('daily digest due but nothing new');
       }
@@ -68,12 +69,19 @@ export class Poller {
     this.timer = setTimeout(async () => {
       this.timer = null;
       await this.cycle();
-      this.schedule(this.nextDelayMs());
+      this.schedule(await this.nextDelayMs());
     }, delayMs);
   }
 
-  private nextDelayMs(): number {
-    const settings = getSettings(this.db);
+  /** Settings unreadable (database down): the defaults keep the loop alive until it answers again. */
+  private async nextDelayMs(): Promise<number> {
+    let settings: Settings;
+    try {
+      settings = await getSettings(this.db);
+    } catch (err) {
+      this.logger.error({ err: errInfo(err) }, 'cannot read settings, using defaults for the next delay');
+      settings = DEFAULT_SETTINGS;
+    }
     const base = this.syncer.nextDelayMin(settings) * 60_000;
     const jitter = (this.random() * 2 - 1) * 0.1 * base;
     return Math.max(1000, Math.round(base + jitter));

@@ -1,6 +1,5 @@
-import path from 'node:path';
 import { createApp } from './app';
-import { openDb } from './db';
+import { openDb, redactUrl, resolveDatabase } from './db';
 import { loadEnv } from './env';
 import { loadSessionSecret } from './lib/auth';
 import { Poller } from './lib/poller';
@@ -14,8 +13,22 @@ const env = loadEnv();
 configureLog(env.LOG_LEVEL);
 const boot = log('boot');
 
-const dbh = openDb(path.join(env.DATA_DIR, 'octotally.db'));
-seedViews(dbh.db);
+const target = (() => {
+  try {
+    return resolveDatabase(env);
+  } catch (err) {
+    boot.fatal({ err: errInfo(err) }, 'cannot resolve the database');
+    process.exit(1);
+  }
+})();
+const dbh = await openDb(target).catch((err) => {
+  boot.fatal(
+    { err: errInfo(err), engine: target.engine, url: redactUrl(target.url), source: target.source },
+    'cannot open the database',
+  );
+  process.exit(1);
+});
+await seedViews(dbh.db);
 
 const tokens = new EnvToken(env.GITHUB_TOKEN);
 const syncer = new Syncer({ db: dbh.db, tokens });
@@ -31,6 +44,7 @@ boot.info(
     version: VERSION,
     port: env.PORT,
     dataDir: env.DATA_DIR,
+    database: { engine: target.engine, schema: target.schema, source: target.source },
     webDist: env.webDist,
     github: tokens.describe(),
     apiToken: Boolean(env.API_TOKEN),
@@ -50,7 +64,7 @@ async function shutdown(signal: string) {
   boot.info({ signal }, 'shutting down');
   poller.stop();
   await server.stop(true);
-  dbh.close();
+  await dbh.close();
   process.exit(0);
 }
 process.on('SIGINT', () => void shutdown('SIGINT'));
