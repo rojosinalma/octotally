@@ -146,10 +146,12 @@ export function apiRoutes(deps: AppDeps) {
   // --- misc ----------------------------------------------------------------------
   app.get('/repos', async (c) => jsonOk(c, 'ok', { repos: await repoCounts(db) }));
 
-  // The member switcher: only when this instance is an Octoforge member and has a list.
-  app.get('/siblings', async (c) =>
-    jsonOk(c, 'ok', { siblings: deps.env.OCTOFORGE_TOKEN ? await loadSiblings(db) : null }),
-  );
+  // The member switcher: only while this instance is an Octoforge member with a fresh list.
+  app.get('/siblings', async (c) => {
+    if (!deps.env.OCTOFORGE_TOKEN) return jsonOk(c, 'ok', { siblings: null });
+    const { siblingsMaxAgeMin } = await getSettings(db);
+    return jsonOk(c, 'ok', { siblings: await loadSiblings(db, siblingsMaxAgeMin) });
+  });
 
   app.get('/notifiers', async (c) => {
     const settings = await getSettings(db);

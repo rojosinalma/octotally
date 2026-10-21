@@ -153,8 +153,10 @@ lost on rollback, while everything else comes back from GitHub on the next sync.
 
 Octoforge sends every tool the list of its siblings, so you can jump from one to the next. In
 Octotally that list becomes a menu behind the grid button left of the logo: Octoforge on top, then
-every tool, with Octotally itself ticked. Without `OCTOFORGE_TOKEN`, or before Octoforge has sent a
-list, the button is not there.
+every tool, with Octotally itself ticked. The button is there only while Octoforge is set up:
+`OCTOFORGE_TOKEN` is set and the last list is fresh. Octoforge sends it every 60 minutes by default,
+so a list whose `updated_at` is older than three periods (setting `siblingsMaxAgeMin`, 180 minutes)
+counts as gone and the button disappears until the next list arrives.
 
 ### `PUT /siblings`
 
@@ -185,5 +187,5 @@ Removes the list and so the switcher. The answer says whether there was one:
 ### `GET /api/siblings`
 
 What the browser reads, behind the usual `/api` gate: `{ok, message, siblings}`, where `siblings`
-is the stored list plus `self` (`"octotally"`) and `received_at`, or `null` when there is no list
-or `OCTOFORGE_TOKEN` is unset. The page reloads it every five minutes.
+is the stored list plus `self` (`"octotally"`) and `received_at`, or `null` when there is no list,
+the list is older than `siblingsMaxAgeMin`, or `OCTOFORGE_TOKEN` is unset. The page reloads it every five minutes.
