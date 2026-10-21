@@ -23,6 +23,7 @@ import { useApp } from '../hooks/useApp';
 import { absoluteTime, relativeTime } from '../lib/format';
 import { linkClick } from '../router';
 import { THEME_LABELS, THEMES } from '../theme';
+import { MemberSwitcher } from './MemberSwitcher';
 
 interface Props {
   /** Search bar slot (dashboard only). */
@@ -62,6 +63,7 @@ export function Header({ search, onShowShortcuts }: Props) {
 
   return (
     <PrimerHeader className="app-header" aria-label="Octotally">
+      <MemberSwitcher />
       <PrimerHeader.Item>
         <PrimerHeader.Link href="/" onClick={linkClick('/')} className="wordmark" aria-label="Octotally home">
           <svg aria-hidden="true" viewBox="0 0 32 32" width="24" height="24" className="wordmark-mark">

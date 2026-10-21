@@ -43,6 +43,8 @@ Changes to these routes are additive; a breaking change bumps the major version.
 | `PUT` `DELETE` | `/api/octoforge/github` | Hand over / drop a GitHub token |
 | `POST` | `/api/octoforge/database/adopt` | Move the data to another database (restart required) |
 | `DELETE` | `/api/octoforge/database` | Undo the move (restart required) |
+| `PUT` `DELETE` | `/api/octoforge/siblings` | Store / clear the list behind the app switcher |
+| `GET` | `/api/siblings` | The stored app list for the switcher, or `null` ([octoforge.md](octoforge.md#the-app-switcher)) |
 
 Unknown `/api/*` path → `404 {ok:false, kind:"not_found"}`.
 

@@ -46,6 +46,8 @@ everything that involves you, and an App cannot do that. The manifest asks for:
 | `DELETE` | `/api/octoforge/github` | Forget the handed-over token and go back to `GITHUB_TOKEN`. |
 | `POST` | `/api/octoforge/database/adopt` | Move the data to another database. |
 | `DELETE` | `/api/octoforge/database` | Undo the move (after a restart). |
+| `PUT` | `/api/octoforge/siblings` | Store the list of Octoforge apps for the app switcher. |
+| `DELETE` | `/api/octoforge/siblings` | Forget that list; the switcher disappears. |
 
 ### `GET /status`
 
@@ -146,3 +148,42 @@ The old database is never touched, so rolling back is two steps:
 
 Rows written after the move stay in the new database only: done and muted marks set in between are
 lost on rollback, while everything else comes back from GitHub on the next sync.
+
+## The app switcher
+
+Octoforge sends every tool the list of its siblings, so you can jump from one to the next. In
+Octotally that list becomes a menu behind the grid button left of the logo: Octoforge on top, then
+every tool, with Octotally itself ticked. Without `OCTOFORGE_TOKEN`, or before Octoforge has sent a
+list, the button is not there.
+
+### `PUT /siblings`
+
+```json
+{
+  "forge": { "title": "Octoforge", "url": "https://forge.example.com", "icon": "https://forge.example.com/favicon.svg" },
+  "members": [
+    { "name": "octotally", "title": "Octotally", "url": "https://tally.example.com", "icon": "https://tally.example.com/favicon.svg" },
+    { "name": "octowarden", "title": "Octowarden", "url": "https://warden.example.com" }
+  ],
+  "updated_at": "2026-10-21T12:00:00Z"
+}
+```
+
+Every `url` and `icon` must be an absolute `http://` or `https://` URL; anything else gets `400`
+and the list stored before stays. `icon` is optional, and an icon that does not load shows a plain
+one instead. Octotally picks its own row by `name` (`octotally`). The answer is `{ok, message}`.
+
+Octoforge sends the list again whenever a tool is added, changed or removed, and on a schedule, so a
+restarted Octotally gets it back. The list lives in the `settings` table under the key
+`octoforge.siblings`, next to the token and just as invisible to `GET/PUT /api/settings`.
+
+### `DELETE /siblings`
+
+Removes the list and so the switcher. The answer says whether there was one:
+`{ok, message, removed}`.
+
+### `GET /api/siblings`
+
+What the browser reads, behind the usual `/api` gate: `{ok, message, siblings}`, where `siblings`
+is the stored list plus `self` (`"octotally"`) and `received_at`, or `null` when there is no list
+or `OCTOFORGE_TOKEN` is unset. The page reloads it every five minutes.

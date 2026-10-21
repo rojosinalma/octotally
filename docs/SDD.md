@@ -55,7 +55,7 @@ GitHub GraphQL ──search(involves:@me, ISSUE_ADVANCED)──┐
 | `lib/items.ts`, `lib/settings.ts`, `lib/relevance.ts` | Item queries and mute/done/restore; settings merge/patch and view seeding; the pure relevance rules. |
 | `lib/github/user.ts` | REST `GET /user`: who a token acts as, used to check a token Octoforge hands over. |
 | `lib/auth.ts`, `lib/token.ts` | HMAC session cookie, constant-time compare, session-secret persistence; the `TokenSource` seam (`LayeredToken`: delivered token over `GITHUB_TOKEN`; `EnvToken`). |
-| `lib/octoforge/{manifest,credentials,database}.ts` | Member contract v1: the bundled `octoforge.json`, the encrypted store for a delivered GitHub token, database status, adoption and rollback. |
+| `lib/octoforge/{manifest,credentials,database,siblings}.ts` | Member contract v1: the bundled `octoforge.json`, the encrypted store for a delivered GitHub token, database status, adoption and rollback, the stored app switcher list. |
 | `log.ts` | pino root logger with child loggers per subsystem (`http github poll digest notify db boot auth octoforge`). |
 
 ### Web (`packages/web/src`)
@@ -80,7 +80,7 @@ Postgres query names its schema, so nothing depends on `search_path`.
 |---|---|
 | `items` | One row per GitHub issue / PR / discussion ever seen, keyed by the GraphQL node id: type, number, title, url, repo/owner, state, draft flag, author, labels/assignees/roles (JSON), comment count, linked PRs (JSON), answered flag, `createdAt`/`updatedAt`/`lastActivityAt`(+`By`), the local state `hidden` (`none|muted|done`), `hiddenAt`, `mutedActivityAt`, `firstSeenAt`, `lastSyncedAt`. Indexed on `repo` and `lastActivityAt`. Rows are never deleted. |
 | `activity` | The last `activityKeep` events per item (kind, actor, summary, url, `at`), plus `seenAt` = when the tracker noticed it. Digests are cut by `seenAt`, not `at`. Cascades on item delete. |
-| `settings` | `key → JSON value`, validated by the shared `Settings` schema and merged over defaults at read time. One extra key outside that schema, `octoforge.github_token`, holds a token delivered by Octoforge, encrypted (AES-256-GCM). |
+| `settings` | `key → JSON value`, validated by the shared `Settings` schema and merged over defaults at read time. Two extra keys sit outside that schema: `octoforge.github_token` holds a token delivered by Octoforge, encrypted (AES-256-GCM), and `octoforge.siblings` the app switcher list. |
 | `views` | Built-in and custom views: id, name, query, `builtin`, `position`. Built-ins are seeded, never overwritten. |
 | `digests` | Send log: `sentAt`, `kind` (`daily|realtime|test`), notifier, `payloadHash`. |
 | `sync_runs` | One row per sync: timestamps, ok/error, rate limit remaining/reset, login, counts. |
@@ -118,6 +118,9 @@ Outside the database: `DATA_DIR/session.secret` (0600) when `SESSION_SECRET` is 
 7. **Database move.** `POST /api/octoforge/database/adopt` migrates the target, copies the rows,
    compares counts and writes `octoforge-database.json`; the next start uses the new database.
    `DELETE /api/octoforge/database` plus a restart rolls back. Details: [octoforge.md](octoforge.md).
+8. **App switcher.** `PUT /api/octoforge/siblings` validates Octoforge's list (http(s) URLs only)
+   and stores it under the settings key `octoforge.siblings`; `GET /api/siblings` hands it to the
+   header menu, and only while `OCTOFORGE_TOKEN` is set.
 
 ### Relevance rules
 
@@ -161,7 +164,8 @@ Full tables: [configuration.md](configuration.md).
 | Notifiers as a registry | Adding a transport is one file and one line; configuration comes from settings so the UI lists it automatically. |
 | Primer React and the stock Primer themes | The UI should read like GitHub; extra themes reuse Primer's CSS-variable contract. |
 | Non-root image, `/data` volume only | No capabilities, no sockets; `GITHUB_TOKEN` is read from the environment and never persisted. |
-| Octoforge member contract v1, opt-in | One manifest and six routes let Octoforge list the app, hand it a token and move its data. Without `OCTOFORGE_TOKEN` none of it exists, so standalone use does not change. The routes have their own bearer so the UI gate and `API_TOKEN` stay as they are. |
+| Octoforge member contract v1, opt-in | One manifest and a handful of routes let Octoforge list the app, hand it a token, move its data and push the app switcher list. Without `OCTOFORGE_TOKEN` none of it exists, so standalone use does not change. The routes have their own bearer so the UI gate and `API_TOKEN` stay as they are. |
+| App switcher from a pushed list | Octoforge knows where every tool runs; each tool only stores what it is told. The links come from outside, so only http(s) URLs pass, and the menu stays hidden without `OCTOFORGE_TOKEN`. |
 | Delivered token encrypted in the settings table | A handed-over token must survive restarts and win over `GITHUB_TOKEN` without one. It sits under a key outside the `Settings` schema, so the settings API never sees it, and is encrypted (AES-256-GCM, key from HKDF over the session secret) because the database may move to a shared Postgres that a read-only role can read. A rotated secret means a fallback to `GITHUB_TOKEN`, not a crash. |
 
 ## Current scope and non-goals

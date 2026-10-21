@@ -1,4 +1,4 @@
-import type { OctoforgeStatus } from '@octotally/shared';
+import { OctoforgeSiblings, type OctoforgeStatus } from '@octotally/shared';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import type { AppDeps } from '../app';
@@ -8,6 +8,7 @@ import { fetchTokenUser } from '../lib/github/user';
 import { CredentialStore } from '../lib/octoforge/credentials';
 import { adoptDatabase, DatabaseError, databaseStatus, dropAdoptedDatabase } from '../lib/octoforge/database';
 import { MANIFEST } from '../lib/octoforge/manifest';
+import { clearSiblings, saveSiblings } from '../lib/octoforge/siblings';
 import { log } from '../log';
 import { VERSION } from '../version';
 import { jsonErr, jsonOk, zodMessage } from './respond';
@@ -166,6 +167,23 @@ export function octoforgeRoutes(deps: AppDeps) {
     } catch (err) {
       return databaseFailure(c, 'dropping the adopted database failed', err);
     }
+  });
+
+  app.put('/siblings', async (c) => {
+    const parsed = OctoforgeSiblings.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return jsonErr(c, 'validation', zodMessage(parsed.error));
+    await saveSiblings(deps.dbh.db, parsed.data);
+    logger.info(
+      { members: parsed.data.members.map((m) => m.name), updated_at: parsed.data.updated_at },
+      'sibling list stored',
+    );
+    return jsonOk(c, `sibling list stored (${parsed.data.members.length} members)`);
+  });
+
+  app.delete('/siblings', async (c) => {
+    const removed = await clearSiblings(deps.dbh.db);
+    logger.info({ removed }, 'sibling list cleared');
+    return jsonOk(c, removed ? 'sibling list removed' : 'no sibling list stored', { removed });
   });
 
   app.all('*', notFound);

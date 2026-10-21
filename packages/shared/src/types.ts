@@ -212,5 +212,6 @@ export const API_ROUTES = {
   view: (id: string) => `/api/views/${encodeURIComponent(id)}`,
   settings: '/api/settings',
   repos: '/api/repos',
+  siblings: '/api/siblings',
   testNotifier: (name: string) => `/api/notifiers/${encodeURIComponent(name)}/test`,
 } as const;
