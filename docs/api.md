@@ -38,8 +38,17 @@ Changes to these routes are additive; a breaking change bumps the major version.
 | `GET` | `/api/version` | `{ok, message, version}` |
 | `GET` | `/health` | `{ok, db, version, lastSyncAt, githubRateRemaining}`; 503 when the database is unreachable |
 | `GET` `POST` | `/auth/status`, `/auth/login`, `/auth/logout` | Session handling ([authentication.md](authentication.md#auth-routes)) |
+| `GET` | `/api/octoforge/manifest` | The `octoforge.json` manifest (only with `OCTOFORGE_TOKEN` set) |
+| `GET` | `/api/octoforge/status` | Contract, version, token and database origin ([octoforge.md](octoforge.md)) |
+| `PUT` `DELETE` | `/api/octoforge/github` | Hand over / drop a GitHub token |
+| `POST` | `/api/octoforge/database/adopt` | Move the data to another database (restart required) |
+| `DELETE` | `/api/octoforge/database` | Undo the move (restart required) |
 
 Unknown `/api/*` path → `404 {ok:false, kind:"not_found"}`.
+
+The `/api/octoforge/*` routes have their own gate: they exist only when `OCTOFORGE_TOKEN` is set
+(otherwise every one answers 404), and all but the manifest need
+`Authorization: Bearer <OCTOFORGE_TOKEN>`. `API_TOKEN` and the session cookie do not apply there.
 
 ## Health
 
@@ -113,3 +122,21 @@ their defaults are listed in [configuration.md](configuration.md#settings-in-the
 ### `GET /api/version` → `{ok, message, version}`
 
 Digest message format and notifier extension: [notifications.md](notifications.md).
+
+## Octoforge
+
+Only with `OCTOFORGE_TOKEN` set; bearer `OCTOFORGE_TOKEN` on everything but the manifest.
+Full description, token storage and the database move: [octoforge.md](octoforge.md).
+
+### `GET /api/octoforge/manifest` → the `octoforge.json` document (no envelope, no bearer).
+### `GET /api/octoforge/status` → `{ok, message, contract, version, github: {mode, source, login?}, database: {engine, schema?, source}}`
+`mode` is `"pat"` or `null`; `source` is `env`, `octoforge` or `none`. Never returns a secret.
+### `PUT /api/octoforge/github` body `{mode: "pat", token}` → `{ok, message, login, restart_required: false}`
+Checked with GitHub `GET /user`: rejected token or a non-user account → 400 (GitHub's reason in
+`message`), GitHub unreachable or `5xx` → 502. `mode: "app"` → 400. The stored token wins over
+`GITHUB_TOKEN` from the next sync on, and one sync starts at once.
+### `DELETE /api/octoforge/github` → `{ok, message, restart_required: false}` — back to `GITHUB_TOKEN`.
+### `POST /api/octoforge/database/adopt` body `{url, schema = "octotally", copy = true}` → `{ok, message, tables, restart_required: true}`
+`url` starts with `postgres://`, `postgresql://` or `sqlite:`; `schema` matches `^[a-z_][a-z0-9_]*$`.
+Bad input → 400, database unreachable → 502, other failures → 500. The URL is never echoed.
+### `DELETE /api/octoforge/database` → `{ok, message, removed, restart_required: true}`

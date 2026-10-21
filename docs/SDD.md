@@ -14,11 +14,13 @@ and one file to run, one definition of every shape shared by server and UI.
 
 ## Architecture
 
-One Bun process, one SQLite file, three workspace packages.
+One Bun process, one database (a SQLite file by default, or a Postgres schema), three workspace
+packages. Optionally it is a member of [Octoforge](octoforge.md), which can hand it a GitHub token
+and host its database.
 
 | Package | Role |
 |---|---|
-| `packages/shared` | The contract. Zod schemas for `Item`, `Activity`, `Settings`, `View`, API envelopes and routes (`src/types.ts`); the search grammar, matcher and sorter (`src/search.ts`). Imported by server and web, so there is one definition of every shape and one parser. |
+| `packages/shared` | The contract. Zod schemas for `Item`, `Activity`, `Settings`, `View`, API envelopes and routes (`src/types.ts`); the search grammar, matcher and sorter (`src/search.ts`); the Octoforge manifest schema (`src/octoforge.ts`). Imported by server and web, so there is one definition of every shape and one parser. |
 | `packages/server` | Bun + [Hono](https://hono.dev). `src/routes` validates input and delegates to `src/lib`; `src/db` holds the Drizzle schema over `bun:sqlite`, migrations under `drizzle/`. Serves the built SPA from `WEB_DIST`. |
 | `packages/web` | Vite + React + [Primer React](https://primer.style). Talks to `/api/*`, filters client-side with the shared grammar for instant feedback, and lets the server run the authoritative query. |
 
@@ -44,15 +46,17 @@ GitHub GraphQL ──search(involves:@me, ISSUE_ADVANCED)──┐
 |---|---|
 | `index.ts` | Boot: load env, open the database, seed built-in views, build `Syncer` + `Poller`, load the session secret, start `Bun.serve` on `0.0.0.0:PORT`, start the poller (2 s after boot when a token exists), handle `SIGINT`/`SIGTERM`. |
 | `env.ts` | Zod schema of the environment: bootstrap values and secrets only, empty strings count as unset. |
-| `app.ts` | Hono app: request log middleware, error handler (`kind: system`), `/health`, `/auth`, the `/api/*` gate (`apiAllowed`), `/api` routes, static SPA with `index.html` fallback and immutable caching for `/assets/`. |
-| `routes/api.ts`, `routes/auth.ts`, `routes/health.ts`, `routes/respond.ts` | Routes validate (zod), call `lib/`, answer with `jsonOk` / `jsonErr`. |
+| `app.ts` | Hono app: request log middleware, error handler (`kind: system`), `/health`, `/auth`, `/api/octoforge` (own bearer, mounted before the gate), the `/api/*` gate (`apiAllowed`), `/api` routes, static SPA with `index.html` fallback and immutable caching for `/assets/`. |
+| `routes/api.ts`, `routes/auth.ts`, `routes/health.ts`, `routes/octoforge.ts`, `routes/respond.ts` | Routes validate (zod), call `lib/`, answer with `jsonOk` / `jsonErr`. |
 | `lib/github/{client,queries,fetch,map,schema}.ts` | Minimal GraphQL client (one method, typed errors `auth|rate_limit|upstream|schema`, retries on 502/503/504 and secondary rate limits, rate-limit bookkeeping on every call); the query documents; paging; zod validation of responses; mapping to `Item`/`Activity`. |
 | `lib/sync.ts` | `Syncer`: one sync at a time (mutex), viewer login → involvement searches → role searches → one transaction of upserts; backoff state; `status()` for `/api/status` and `/health`. |
 | `lib/poller.ts` | `setTimeout` loop: sync → realtime digest → daily digest if due → schedule the next run from the settings read this cycle (±10 % jitter, syncer backoff). Nothing in it throws. |
 | `lib/digest.ts`, `lib/notifiers/` | Builds daily/realtime messages from activity noticed since the last digest; dispatches to configured notifiers; records sends with a payload hash. |
 | `lib/items.ts`, `lib/settings.ts`, `lib/relevance.ts` | Item queries and mute/done/restore; settings merge/patch and view seeding; the pure relevance rules. |
-| `lib/auth.ts`, `lib/token.ts` | HMAC session cookie, constant-time compare, session-secret persistence; the `TokenSource` seam (`EnvToken` today). |
-| `log.ts` | pino root logger with child loggers per subsystem (`http github poll digest notify db boot auth`). |
+| `lib/github/user.ts` | REST `GET /user`: who a token acts as, used to check a token Octoforge hands over. |
+| `lib/auth.ts`, `lib/token.ts` | HMAC session cookie, constant-time compare, session-secret persistence; the `TokenSource` seam (`LayeredToken`: delivered token over `GITHUB_TOKEN`; `EnvToken`). |
+| `lib/octoforge/{manifest,credentials,database}.ts` | Member contract v1: the bundled `octoforge.json`, the encrypted store for a delivered GitHub token, database status, adoption and rollback. |
+| `log.ts` | pino root logger with child loggers per subsystem (`http github poll digest notify db boot auth octoforge`). |
 
 ### Web (`packages/web/src`)
 
@@ -65,20 +69,23 @@ talks to `api.ts`; `lib/search.ts` re-runs the shared grammar on the loaded item
 
 ## Data model and storage
 
-SQLite via `bun:sqlite` (WAL, foreign keys, 5 s busy timeout) at `DATA_DIR/octotally.db`. Schema
-in `packages/server/src/db/schema.ts`; Drizzle migrations in `packages/server/drizzle/`, applied
-on every boot, additive only.
+SQLite via `bun:sqlite` (WAL, foreign keys, 5 s busy timeout) at `DATA_DIR/octotally.db` by
+default, or Postgres in the schema `DATABASE_SCHEMA` (default `octotally`) when `DATABASE_URL`
+points at one. Schema in `packages/server/src/db/`; Drizzle migrations in
+`packages/server/drizzle/`, applied on every boot, additive only, for both engines.
 
 | Table | Content |
 |---|---|
 | `items` | One row per GitHub issue / PR / discussion ever seen, keyed by the GraphQL node id: type, number, title, url, repo/owner, state, draft flag, author, labels/assignees/roles (JSON), comment count, linked PRs (JSON), answered flag, `createdAt`/`updatedAt`/`lastActivityAt`(+`By`), the local state `hidden` (`none|muted|done`), `hiddenAt`, `mutedActivityAt`, `firstSeenAt`, `lastSyncedAt`. Indexed on `repo` and `lastActivityAt`. Rows are never deleted. |
 | `activity` | The last `activityKeep` events per item (kind, actor, summary, url, `at`), plus `seenAt` = when the tracker noticed it. Digests are cut by `seenAt`, not `at`. Cascades on item delete. |
-| `settings` | `key → JSON value`, validated by the shared `Settings` schema and merged over defaults at read time. |
+| `settings` | `key → JSON value`, validated by the shared `Settings` schema and merged over defaults at read time. One extra key outside that schema, `octoforge.github_token`, holds a token delivered by Octoforge, encrypted (AES-256-GCM). |
 | `views` | Built-in and custom views: id, name, query, `builtin`, `position`. Built-ins are seeded, never overwritten. |
 | `digests` | Send log: `sentAt`, `kind` (`daily|realtime|test`), notifier, `payloadHash`. |
 | `sync_runs` | One row per sync: timestamps, ok/error, rate limit remaining/reset, login, counts. |
 
-Outside the database: `DATA_DIR/session.secret` (0600) when `SESSION_SECRET` is not set.
+Outside the database: `DATA_DIR/session.secret` (0600) when `SESSION_SECRET` is not set, and
+`DATA_DIR/octoforge-database.json` (0600) after an Octoforge database move; it overrides
+`DATABASE_URL`/`DATABASE_SCHEMA` at start-up.
 
 ## Key flows
 
@@ -101,6 +108,14 @@ Outside the database: `DATA_DIR/session.secret` (0600) when `SESSION_SECRET` is 
    mute/done/restore optimistically; the server's answer replaces the row.
 5. **Auth.** `/api/*` passes when a bearer equals `API_TOKEN`, or `AUTH_PASSWORD` is unset, or the
    `octotally_session` cookie verifies. `/health`, `/auth/*` and the static bundle are never gated.
+   `/api/octoforge/*` has its own gate: it exists only with `OCTOFORGE_TOKEN` and needs that bearer
+   (manifest excepted).
+6. **Token delivery.** `PUT /api/octoforge/github` checks the token with GitHub `GET /user`
+   (must be a user), encrypts it into the settings table and starts a sync. `LayeredToken` reads it
+   on every sync and falls back to `GITHUB_TOKEN` when there is none or it cannot be decrypted.
+7. **Database move.** `POST /api/octoforge/database/adopt` migrates the target, copies the rows,
+   compares counts and writes `octoforge-database.json`; the next start uses the new database.
+   `DELETE /api/octoforge/database` plus a restart rolls back. Details: [octoforge.md](octoforge.md).
 
 ### Relevance rules
 
@@ -117,8 +132,8 @@ The built-in views express these as search strings (`updated:>{activeWindowDays}
 ## Configuration surface
 
 - **Environment** (bootstrap and secrets, `env.ts`): `GITHUB_TOKEN`, `AUTH_PASSWORD`,
-  `SESSION_SECRET`, `API_TOKEN`, `LOG_LEVEL`, `PORT`, `DATA_DIR`, `WEB_DIST`. Nothing tunable
-  lives here.
+  `SESSION_SECRET`, `API_TOKEN`, `OCTOFORGE_TOKEN`, `DATABASE_URL`, `DATABASE_SCHEMA`, `LOG_LEVEL`,
+  `PORT`, `DATA_DIR`, `WEB_DIST`. Nothing tunable lives here.
 - **Settings table** (every tunable, editable at runtime from the Settings page or
   `PUT /api/settings`): `activeWindowDays`, `pollIntervalMin`, `backoffMaxMin`, `activityKeep`,
   `digestDaily`, `digestHour`, `timezone`, `digestRealtime`, `discordWebhookUrl`, `theme`,
@@ -133,7 +148,8 @@ Full tables: [configuration.md](configuration.md).
 |---|---|
 | Shared `packages/shared` for schemas and the grammar | One parser and one shape definition; the browser can filter instantly with the exact semantics the server applies. |
 | Zod at every boundary (env, API bodies, GitHub responses, settings) | GitHub's schema drifts and stored JSON must never be trusted blindly; validation errors are reported with every issue. |
-| SQLite, WAL, one file | One account's involvement is small; a single file keeps backup and upgrade trivial and avoids a second service. |
+| SQLite, WAL, one file by default | One account's involvement is small; a single file keeps backup and upgrade trivial and avoids a second service. |
+| Postgres as a second engine (one schema per instance) | Octoforge hosts its members' data in one Postgres database, one schema each, so cross-tool views can read it. Same Drizzle schema and additive migrations for both engines; SQLite stays the default and needs nothing. |
 | Rows are never deleted | The local state (done/muted) is the product; an item that drops out of `involves:` must not take its history with it. |
 | Settings in the database, not env | Every tunable changes at runtime without a restart; env holds only what the process needs before it can read the database. |
 | `setTimeout` loop, not `setInterval` or cron | No drift, backoff and jitter per cycle, and the next interval is read from the settings of this cycle. One poller, one digest scheduler, nothing else in the background. |
@@ -142,7 +158,9 @@ Full tables: [configuration.md](configuration.md).
 | `TokenSource` interface | The only seam auth changes touch: `EnvToken` now, an OAuth implementation later, nothing else knows where the token comes from. |
 | Notifiers as a registry | Adding a transport is one file and one line; configuration comes from settings so the UI lists it automatically. |
 | Primer React and the stock Primer themes | The UI should read like GitHub; extra themes reuse Primer's CSS-variable contract. |
-| Non-root image, `/data` volume only | No capabilities, no sockets; the token is read from the environment and never persisted. |
+| Non-root image, `/data` volume only | No capabilities, no sockets; `GITHUB_TOKEN` is read from the environment and never persisted. |
+| Octoforge member contract v1, opt-in | One manifest and six routes let Octoforge list the app, hand it a token and move its data. Without `OCTOFORGE_TOKEN` none of it exists, so standalone use does not change. The routes have their own bearer so the UI gate and `API_TOKEN` stay as they are. |
+| Delivered token encrypted in the settings table | A handed-over token must survive restarts and win over `GITHUB_TOKEN` without one. It sits under a key outside the `Settings` schema, so the settings API never sees it, and is encrypted (AES-256-GCM, key from HKDF over the session secret) because the database may move to a shared Postgres that a read-only role can read. A rotated secret means a fallback to `GITHUB_TOKEN`, not a crash. |
 
 ## Current scope and non-goals
 
