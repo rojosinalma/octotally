@@ -23,16 +23,20 @@ decide it is done.
 - Item panel with the latest activity, labels, assignees and linked PRs
 - Discord digest: daily at a chosen hour and/or near-real-time pings ([notifications.md](notifications.md))
 - Keyboard first: `j`/`k` move, `e` done, `m` mute, `o` open on GitHub, `/` search, `?` help
-- All nine GitHub Primer themes plus a Dracula theme, following the OS by default ([themes.md](themes.md))
+- Every [tailor](https://github.com/rojosinalma/tailor) skin and palette, in dark and light; the GitHub look (`primer` skin) by default, following the OS ([themes.md](themes.md))
 - JSON API for scripts and agents ([api.md](api.md)), `/health` for monitors ([operations.md](operations.md))
 - Rate-limit aware poller with backoff; cached data is served while GitHub is down
 
 ## Screenshots
 
-| Dashboard (dark dimmed) | Dashboard (light) | Dashboard (high contrast) |
+| Dashboard (Primer, dark) | Dashboard (Primer, light) | Dashboard (Pico, Nord) |
 |---|---|---|
-| ![Dashboard, dark dimmed theme](screenshots/dashboard-dark-dimmed.png) | ![Dashboard, light theme](screenshots/dashboard-light.png) | ![Dashboard, high contrast theme](screenshots/dashboard-high-contrast.png) |
+| ![Dashboard, Primer skin, dark](screenshots/dashboard-primer-dark.png) | ![Dashboard, Primer skin, light](screenshots/dashboard-primer-light.png) | ![Dashboard, Pico skin, Nord palette](screenshots/dashboard-pico-nord.png) |
 
 | Item panel | Search autocomplete | Settings |
 |---|---|---|
-| ![Item panel, dark dimmed theme](screenshots/item-panel-dark-dimmed.png) | ![Search autocomplete, light theme](screenshots/search-autocomplete-light.png) | ![Settings, dark dimmed theme](screenshots/settings-dark-dimmed.png) |
+| ![Item panel, Primer skin, dark](screenshots/item-panel-primer-dark.png) | ![Search autocomplete, Primer skin, light](screenshots/search-autocomplete-primer-light.png) | ![Settings, Primer skin, dark](screenshots/settings-primer-dark.png) |
+
+| Terminal look (WebTUI, Gruvbox) | daisyUI, Catppuccin, light |
+|---|---|
+| ![Dashboard, WebTUI skin, Gruvbox palette](screenshots/dashboard-webtui-gruvbox.png) | ![Dashboard, daisyUI skin, Catppuccin palette, light](screenshots/dashboard-daisyui-catppuccin-light.png) |

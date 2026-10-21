@@ -1,6 +1,5 @@
-import { AlertIcon } from '@primer/octicons-react';
-import { Button, Token } from '@primer/react';
 import { useMemo } from 'react';
+import { Ui } from 'tailor-react';
 import { chipsFromQuery, removeToken } from '../lib/search';
 
 interface Props {
@@ -15,28 +14,30 @@ export function FilterChips({ query, onChange }: Props) {
   const unknownCount = chips.filter((c) => c.kind === 'unknown').length;
   return (
     <fieldset className="filter-chips">
-      <legend className="sr-only">Active filters</legend>
-      {chips.map((chip) => (
-        <Token
-          key={chip.token}
-          size="large"
-          text={chip.label}
-          leadingVisual={chip.kind === 'unknown' ? AlertIcon : undefined}
-          className={
-            chip.kind === 'unknown' ? 'chip-unknown' : chip.kind === 'text' ? 'chip-text' : undefined
-          }
-          title={chip.kind === 'unknown' ? `Unknown qualifier: ${chip.token}` : chip.token}
-          onRemove={() => onChange(removeToken(query, chip.token))}
-        />
-      ))}
-      {unknownCount > 0 && (
-        <span className="chip-warning" role="status">
-          {unknownCount === 1 ? '1 filter is not understood' : `${unknownCount} filters are not understood`}
-        </span>
-      )}
-      <Button variant="invisible" size="small" onClick={() => onChange('')}>
-        Clear
-      </Button>
+      <legend className="t-visually-hidden">Active filters</legend>
+      <Ui.Cluster gap="2" align="center">
+        {chips.map((chip) => (
+          <Ui.Chip
+            key={chip.token}
+            tone={chip.kind === 'unknown' ? 'danger' : undefined}
+            className={chip.kind === 'text' ? 'chip-text' : undefined}
+            data-tip={chip.kind === 'unknown' ? `Unknown qualifier: ${chip.token}` : chip.token}
+            onRemove={() => onChange(removeToken(query, chip.token))}
+            removeLabel={`Remove filter ${chip.label}`}
+          >
+            {chip.kind === 'unknown' && <Ui.Icon name="bi-exclamation-triangle" />}
+            {chip.label}
+          </Ui.Chip>
+        ))}
+        {unknownCount > 0 && (
+          <span className="t-small t-tone-text" data-tone="danger" role="status">
+            {unknownCount === 1 ? '1 filter is not understood' : `${unknownCount} filters are not understood`}
+          </span>
+        )}
+        <Ui.Button variant="ghost" size="xs" onClick={() => onChange('')}>
+          Clear
+        </Ui.Button>
+      </Ui.Cluster>
     </fieldset>
   );
 }

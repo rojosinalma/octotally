@@ -1,165 +1,20 @@
-import type { Settings as SettingsT, Theme } from '@octotally/shared';
-import { Settings as SettingsSchema } from '@octotally/shared';
-import { AlertIcon, CheckCircleIcon, PaperAirplaneIcon } from '@primer/octicons-react';
-import { Button, FormControl, Heading, Label, Select, TextInput, ToggleSwitch } from '@primer/react';
-import { type ReactNode, useEffect, useId, useState } from 'react';
+import { type ReactNode, useState } from 'react';
+import { type SaveResult, themeOptions, Ui, useTailorTheme } from 'tailor-react';
 import { api } from '../api';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
 import { useApp } from '../hooks/useApp';
 import { useToast } from '../hooks/useToast';
-import { absoluteTime, minutesToUnit, relativeTime, unitToMinutes } from '../lib/format';
-import { THEME_LABELS, THEMES } from '../theme';
+import { absoluteTime, relativeTime } from '../lib/format';
+import { parseSetting, type SettingKey } from '../lib/settings';
+import { linkClick } from '../router';
 
-type DurationUnit = 'min' | 'h' | 'd';
-
-/** Number + unit input that saves minutes on blur/Enter. */
-function DurationInput({
-  id,
-  minutes,
-  min,
-  max,
-  units,
-  onSave,
-}: {
-  id: string;
-  minutes: number;
-  min: number;
-  max: number;
-  units: DurationUnit[];
-  onSave: (minutes: number) => void;
-}) {
-  const initial = minutesToUnit(minutes);
-  const [value, setValue] = useState(String(initial.value));
-  const [unit, setUnit] = useState<DurationUnit>(
-    units.includes(initial.unit) ? initial.unit : (units[0] ?? 'min'),
-  );
-  useEffect(() => {
-    const u = minutesToUnit(minutes);
-    setValue(String(u.value));
-    setUnit(units.includes(u.unit) ? u.unit : (units[0] ?? 'min'));
-  }, [minutes, units]);
-  const commit = (v = value, u = unit) => {
-    const n = Number(v);
-    if (!Number.isFinite(n) || n <= 0) return;
-    const total = Math.min(max, Math.max(min, unitToMinutes(n, u)));
-    if (total !== minutes) onSave(total);
-  };
-  return (
-    <div className="duration">
-      <TextInput
-        id={id}
-        type="number"
-        min={1}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => commit()}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-        className="duration-value"
-      />
-      <Select
-        aria-label="Unit"
-        value={unit}
-        onChange={(e) => {
-          const u = e.target.value as DurationUnit;
-          setUnit(u);
-          commit(value, u);
-        }}
-      >
-        {units.map((u) => (
-          <Select.Option key={u} value={u}>
-            {u === 'min' ? 'minutes' : u === 'h' ? 'hours' : 'days'}
-          </Select.Option>
-        ))}
-      </Select>
-    </div>
-  );
-}
-
-function NumberInput({
-  id,
-  value,
-  min,
-  max,
-  suffix,
-  onSave,
-}: {
-  id: string;
-  value: number;
-  min: number;
-  max: number;
-  suffix?: string;
-  onSave: (v: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
-  const commit = () => {
-    const n = Math.round(Number(draft));
-    if (!Number.isFinite(n)) return setDraft(String(value));
-    const clamped = Math.min(max, Math.max(min, n));
-    setDraft(String(clamped));
-    if (clamped !== value) onSave(clamped);
-  };
-  return (
-    <TextInput
-      id={id}
-      type="number"
-      min={min}
-      max={max}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && commit()}
-      trailingVisual={suffix ? () => <span>{suffix}</span> : undefined}
-      className="number-input"
-    />
-  );
-}
-
-function Row({
-  label,
-  help,
-  children,
-  id,
-}: {
-  label: string;
-  help: string;
-  children: ReactNode;
-  id?: string;
-}) {
-  return (
-    <FormControl className="settings-row" id={id}>
-      <FormControl.Label>{label}</FormControl.Label>
-      <FormControl.Caption>{help}</FormControl.Caption>
-      {children}
-    </FormControl>
-  );
-}
-
-function Toggle({
-  label,
-  help,
-  checked,
-  onChange,
-}: {
-  label: string;
-  help: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  const id = useId();
-  return (
-    <div className="settings-toggle">
-      <div>
-        <span id={id} className="settings-toggle-label">
-          {label}
-        </span>
-        <p className="fg-muted settings-help">{help}</p>
-      </div>
-      <ToggleSwitch aria-labelledby={id} checked={checked} onChange={onChange} size="small" />
-    </div>
-  );
-}
+const SECTIONS = [
+  ['token', 'GitHub token'],
+  ['sync', 'Sync'],
+  ['digest', 'Discord digest'],
+  ['appearance', 'Appearance'],
+] as const;
 
 const TIMEZONES: string[] = (() => {
   try {
@@ -173,25 +28,20 @@ const TIMEZONES: string[] = (() => {
   }
 })();
 
+/** Help popover of a settings row. */
+const help = (label: string, text: ReactNode) => ({ label: `About ${label.toLowerCase()}`, children: text });
+
 export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void }) {
-  const { settings, updateSettings, status, views } = useApp();
+  const { settings, settingsLoaded, updateSettings, status, views } = useApp();
   const { toast } = useToast();
-  const [webhook, setWebhook] = useState(settings.discordWebhookUrl);
-  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const theme = useTailorTheme();
   const [testing, setTesting] = useState(false);
-  useEffect(() => setWebhook(settings.discordWebhookUrl), [settings.discordWebhookUrl]);
+  const [reveal, setReveal] = useState(false);
 
-  const save = <K extends keyof SettingsT>(key: K, value: SettingsT[K]) =>
-    void updateSettings({ [key]: value });
-
-  const saveWebhook = () => {
-    const parsed = SettingsSchema.shape.discordWebhookUrl.safeParse(webhook.trim());
-    if (!parsed.success) {
-      setWebhookError('Must be an https:// URL (or empty to disable).');
-      return;
-    }
-    setWebhookError(null);
-    if (parsed.data !== settings.discordWebhookUrl) save('discordWebhookUrl', parsed.data);
+  const save = async (key: string, value: string): Promise<SaveResult> => {
+    const parsed = parseSetting(key as SettingKey, value);
+    if ('error' in parsed) return { ok: false, message: parsed.error };
+    return updateSettings(parsed.patch, { quiet: true });
   };
 
   const sendTest = async () => {
@@ -209,31 +59,45 @@ export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void 
   const tokenOk = Boolean(status?.githubLogin);
 
   return (
-    <div className="app-shell">
-      <Header onShowShortcuts={onShowShortcuts} />
-      <main className="settings-page">
-        <Heading as="h1" className="settings-title">
-          Settings
-        </Heading>
-        <p className="fg-muted">Changes save automatically.</p>
+    <Ui.AppShell
+      nav={<Header onShowShortcuts={onShowShortcuts} />}
+      side={
+        <Ui.Sidebar label="Settings sections">
+          <Ui.Sidebar.Group>Settings</Ui.Sidebar.Group>
+          {SECTIONS.map(([id, title]) => (
+            <Ui.Sidebar.Item key={id} href={`#${id}`}>
+              {title}
+            </Ui.Sidebar.Item>
+          ))}
+        </Ui.Sidebar>
+      }
+      foot={<Footer />}
+    >
+      <Ui.Page.Header>
+        <Ui.Page.Back href="/" onClick={linkClick('/')} aria-label="Back to items" />
+        <Ui.Page.Title>Settings</Ui.Page.Title>
+        <Ui.Page.Lead>Changes save automatically.</Ui.Page.Lead>
+      </Ui.Page.Header>
 
-        <section className="settings-card" aria-labelledby="token-status">
-          <h2 id="token-status" className="settings-section-title">
-            GitHub token
-          </h2>
+      <Ui.Stack gap="5" className="settings-page">
+        <Ui.Section title="GitHub token" id="token">
           {status === null ? (
-            <p className="fg-muted">Loading status…</p>
+            <Ui.Cluster gap="2" align="center" aria-busy="true">
+              <Ui.Spinner size="sm" label={null} />
+              <span className="t-muted">Loading status…</span>
+            </Ui.Cluster>
           ) : (
-            <dl className="status-grid">
+            <Ui.Facts>
               <dt>Status</dt>
               <dd>
                 {tokenOk ? (
-                  <span className="fg-success">
-                    <CheckCircleIcon /> Connected as <strong>{status.githubLogin}</strong>
+                  <span className="t-tone-text" data-tone="success">
+                    <Ui.Icon name="bi-check-circle" /> Connected as <strong>{status.githubLogin}</strong>
                   </span>
                 ) : (
-                  <span className="fg-danger">
-                    <AlertIcon /> Not connected — set <code>GITHUB_TOKEN</code> and restart
+                  <span className="t-tone-text" data-tone="danger">
+                    <Ui.Icon name="bi-exclamation-triangle" /> Not connected — set <code>GITHUB_TOKEN</code>{' '}
+                    and restart
                   </span>
                 )}
               </dd>
@@ -243,191 +107,260 @@ export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void 
                 {status.githubRateResetAt ? `, resets ${relativeTime(status.githubRateResetAt)}` : ''}
               </dd>
               <dt>Last sync</dt>
-              <dd title={absoluteTime(status.lastSyncAt)}>
-                {status.lastSyncAt ? relativeTime(status.lastSyncAt) : 'never'}
-                {status.lastSyncOk === false && <Label variant="danger">failed</Label>}
-                {status.syncing && <Label variant="accent">syncing</Label>}
+              <dd>
+                <Ui.Cluster gap="2" align="center">
+                  <span data-tip={absoluteTime(status.lastSyncAt) || undefined}>
+                    {status.lastSyncAt ? relativeTime(status.lastSyncAt) : 'never'}
+                  </span>
+                  {status.lastSyncOk === false && (
+                    <Ui.Badge tone="danger" size="xs">
+                      failed
+                    </Ui.Badge>
+                  )}
+                  {status.syncing && (
+                    <Ui.Badge tone="accent" size="xs">
+                      syncing
+                    </Ui.Badge>
+                  )}
+                </Ui.Cluster>
               </dd>
               <dt>Items tracked</dt>
               <dd>{status.itemCount}</dd>
               {status.lastError && (
                 <>
                   <dt>Last error</dt>
-                  <dd className="fg-danger">{status.lastError}</dd>
+                  <dd className="t-tone-text" data-tone="danger">
+                    {status.lastError}
+                  </dd>
                 </>
               )}
-            </dl>
+            </Ui.Facts>
           )}
-        </section>
+        </Ui.Section>
 
-        <section className="settings-card" aria-labelledby="sync-heading">
-          <h2 id="sync-heading" className="settings-section-title">
-            Sync
-          </h2>
-          <Row
-            label="Active window"
-            help="An item counts as active when it had activity within this many days. Used by the Active view."
-          >
-            <NumberInput
-              id="activeWindowDays"
-              value={settings.activeWindowDays}
-              min={1}
-              max={365}
-              suffix="days"
-              onSave={(v) => save('activeWindowDays', v)}
-            />
-          </Row>
-          <Row label="Poll interval" help="How often GitHub is checked for new activity.">
-            <DurationInput
-              id="pollIntervalMin"
-              minutes={settings.pollIntervalMin}
-              min={1}
-              max={1440}
-              units={['min', 'h']}
-              onSave={(v) => save('pollIntervalMin', v)}
-            />
-          </Row>
-          <Row
-            label="Maximum backoff"
-            help="After GitHub errors or rate limiting, polling slows down exponentially up to this limit."
-          >
-            <DurationInput
-              id="backoffMaxMin"
-              minutes={settings.backoffMaxMin}
-              min={1}
-              max={1440}
-              units={['min', 'h']}
-              onSave={(v) => save('backoffMaxMin', v)}
-            />
-          </Row>
-          <Row label="Activity kept per item" help="Number of recent events stored for each item's timeline.">
-            <NumberInput
-              id="activityKeep"
-              value={settings.activityKeep}
-              min={1}
-              max={500}
-              suffix="events"
-              onSave={(v) => save('activityKeep', v)}
-            />
-          </Row>
-        </section>
-
-        <section className="settings-card" aria-labelledby="digest-heading">
-          <h2 id="digest-heading" className="settings-section-title">
-            Discord digest
-          </h2>
-          <FormControl className="settings-row">
-            <FormControl.Label>Webhook URL</FormControl.Label>
-            <FormControl.Caption>
-              Discord channel webhook (https://discord.com/api/webhooks/…). Leave empty to disable
-              notifications.
-            </FormControl.Caption>
-            <TextInput
-              block
-              type="url"
-              value={webhook}
-              placeholder="https://discord.com/api/webhooks/…"
-              onChange={(e) => setWebhook(e.target.value)}
-              onBlur={saveWebhook}
-              onKeyDown={(e) => e.key === 'Enter' && saveWebhook()}
-              validationStatus={webhookError ? 'error' : undefined}
-              trailingAction={
-                <TextInput.Action
-                  icon={PaperAirplaneIcon}
-                  aria-label="Send test message"
-                  onClick={() => void sendTest()}
-                  disabled={testing || !settings.discordWebhookUrl}
-                />
-              }
-            />
-            {webhookError && <FormControl.Validation variant="error">{webhookError}</FormControl.Validation>}
-          </FormControl>
-          <Button
-            leadingVisual={PaperAirplaneIcon}
-            onClick={() => void sendTest()}
-            disabled={testing || !settings.discordWebhookUrl}
-            size="small"
-          >
-            Send test message
-          </Button>
-          <Toggle
-            label="Daily digest"
-            help="One message per day listing what still needs you."
-            checked={settings.digestDaily}
-            onChange={(v) => save('digestDaily', v)}
-          />
-          <div className="settings-inline">
-            <Row label="Digest hour" help="Local hour (0–23) the daily digest is sent.">
-              <NumberInput
-                id="digestHour"
-                value={settings.digestHour}
-                min={0}
-                max={23}
-                suffix="h"
-                onSave={(v) => save('digestHour', v)}
-              />
-            </Row>
-            <Row label="Timezone" help="IANA timezone the digest hour refers to.">
-              <Select
-                value={settings.timezone}
-                onChange={(e) => save('timezone', e.target.value)}
-                aria-label="Timezone"
-              >
-                {!TIMEZONES.includes(settings.timezone) && (
-                  <Select.Option value={settings.timezone}>{settings.timezone}</Select.Option>
+        {!settingsLoaded ? (
+          <Ui.Cluster gap="2" align="center" aria-busy="true">
+            <Ui.Spinner size="sm" label={null} />
+            <span className="t-muted">Loading settings…</span>
+          </Ui.Cluster>
+        ) : (
+          <Ui.Settings save={save}>
+            <Ui.Section title="Sync" id="sync">
+              <Ui.Settings.Row
+                label="Active window"
+                htmlFor="activeWindowDays"
+                help={help(
+                  'Active window',
+                  'An item counts as active when it had activity within this many days. Used by the Active view.',
                 )}
-                {TIMEZONES.map((tz) => (
-                  <Select.Option key={tz} value={tz}>
-                    {tz}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Row>
-          </div>
-          <Toggle
-            label="Real-time pings"
-            help="A short message whenever new activity arrives on something you are involved in."
-            checked={settings.digestRealtime}
-            onChange={(v) => save('digestRealtime', v)}
-          />
-        </section>
+              >
+                <Ui.InputGroup>
+                  <Ui.Input
+                    id="activeWindowDays"
+                    type="number"
+                    min={1}
+                    max={365}
+                    data-setting="activeWindowDays"
+                    defaultValue={settings.activeWindowDays}
+                  />
+                  <Ui.InputAddon>days</Ui.InputAddon>
+                </Ui.InputGroup>
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Poll interval"
+                htmlFor="pollIntervalMin"
+                setting="pollIntervalMin"
+                help={help('Poll interval', 'How often GitHub is checked for new activity.')}
+              >
+                <Ui.DurationInput id="pollIntervalMin" defaultValue={settings.pollIntervalMin * 60} />
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Maximum backoff"
+                htmlFor="backoffMaxMin"
+                setting="backoffMaxMin"
+                help={help(
+                  'Maximum backoff',
+                  'After GitHub errors or rate limiting, polling slows down exponentially up to this limit.',
+                )}
+              >
+                <Ui.DurationInput id="backoffMaxMin" defaultValue={settings.backoffMaxMin * 60} />
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Activity kept per item"
+                htmlFor="activityKeep"
+                help={help(
+                  'Activity kept per item',
+                  "Number of recent events stored for each item's timeline.",
+                )}
+              >
+                <Ui.InputGroup>
+                  <Ui.Input
+                    id="activityKeep"
+                    type="number"
+                    min={1}
+                    max={500}
+                    data-setting="activityKeep"
+                    defaultValue={settings.activityKeep}
+                  />
+                  <Ui.InputAddon>events</Ui.InputAddon>
+                </Ui.InputGroup>
+              </Ui.Settings.Row>
+            </Ui.Section>
 
-        <section className="settings-card" aria-labelledby="appearance-heading">
-          <h2 id="appearance-heading" className="settings-section-title">
-            Appearance
-          </h2>
-          <Row
-            label="Theme"
-            help="All GitHub themes are available; “Sync with system” follows your OS light/dark preference."
-          >
-            <Select
-              value={settings.theme}
-              onChange={(e) => save('theme', e.target.value as Theme)}
-              aria-label="Theme"
-            >
-              {THEMES.map((t) => (
-                <Select.Option key={t} value={t}>
-                  {THEME_LABELS[t]}
-                </Select.Option>
-              ))}
-            </Select>
-          </Row>
-          <Row label="Default view" help="The view shown when you open Octotally.">
-            <Select
-              value={settings.defaultView}
-              onChange={(e) => save('defaultView', e.target.value)}
-              aria-label="Default view"
-            >
-              {views.map((v) => (
-                <Select.Option key={v.id} value={v.id}>
-                  {v.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Row>
-        </section>
-      </main>
-      <Footer />
-    </div>
+            <Ui.Section title="Discord digest" id="digest">
+              <Ui.Settings.Row
+                label="Webhook URL"
+                htmlFor="discordWebhookUrl"
+                help={help(
+                  'Webhook URL',
+                  'Discord channel webhook (https://discord.com/api/webhooks/…). Leave empty to disable notifications.',
+                )}
+              >
+                <div className="webhook">
+                  <Ui.InputGroup className="webhook-input">
+                    <Ui.Input
+                      id="discordWebhookUrl"
+                      type={reveal ? 'text' : 'password'}
+                      autoComplete="off"
+                      spellCheck={false}
+                      placeholder="https://discord.com/api/webhooks/…"
+                      data-setting="discordWebhookUrl"
+                      defaultValue={settings.discordWebhookUrl}
+                    />
+                    <Ui.Button
+                      iconOnly
+                      aria-label={reveal ? 'Hide webhook URL' : 'Show webhook URL'}
+                      tip={reveal ? 'Hide' : 'Show'}
+                      pressed={reveal}
+                      onClick={() => setReveal((r) => !r)}
+                    >
+                      <Ui.Icon name={reveal ? 'bi-eye-slash' : 'bi-eye'} />
+                    </Ui.Button>
+                  </Ui.InputGroup>
+                  <Ui.Button
+                    busy={testing}
+                    disabled={!settings.discordWebhookUrl}
+                    onClick={() => void sendTest()}
+                  >
+                    <Ui.Icon name="bi-send" /> Send test message
+                  </Ui.Button>
+                </div>
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Daily digest"
+                htmlFor="digestDaily"
+                setting="digestDaily"
+                help={help('Daily digest', 'One message per day listing what still needs you.')}
+              >
+                <Ui.Check
+                  switch
+                  id="digestDaily"
+                  label="Send the daily digest"
+                  defaultChecked={settings.digestDaily}
+                />
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Digest hour"
+                htmlFor="digestHour"
+                help={help('Digest hour', 'Local hour (0–23) the daily digest is sent.')}
+              >
+                <Ui.InputGroup>
+                  <Ui.Input
+                    id="digestHour"
+                    type="number"
+                    min={0}
+                    max={23}
+                    data-setting="digestHour"
+                    defaultValue={settings.digestHour}
+                  />
+                  <Ui.InputAddon>h</Ui.InputAddon>
+                </Ui.InputGroup>
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Timezone"
+                htmlFor="timezone"
+                setting="timezone"
+                help={help('Timezone', 'IANA timezone the digest hour refers to.')}
+              >
+                <Ui.Select id="timezone" defaultValue={settings.timezone}>
+                  {!TIMEZONES.includes(settings.timezone) && (
+                    <option value={settings.timezone}>{settings.timezone}</option>
+                  )}
+                  {TIMEZONES.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </Ui.Select>
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Real-time pings"
+                htmlFor="digestRealtime"
+                setting="digestRealtime"
+                help={help(
+                  'Real-time pings',
+                  'A short message whenever new activity arrives on something you are involved in.',
+                )}
+              >
+                <Ui.Check
+                  switch
+                  id="digestRealtime"
+                  label="Ping on new activity"
+                  defaultChecked={settings.digestRealtime}
+                />
+              </Ui.Settings.Row>
+            </Ui.Section>
+
+            <Ui.Section title="Appearance" id="appearance">
+              <Ui.Settings.Row
+                label="Skin"
+                htmlFor="skin"
+                setting="skin"
+                help={help(
+                  'Skin',
+                  'The design system the page is drawn with. Primer is the GitHub look. The sun/moon button in the footer switches between dark and light.',
+                )}
+              >
+                <Ui.Select id="skin" defaultValue={theme.skin}>
+                  {themeOptions(theme.config, 'skin').map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </Ui.Select>
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Palette"
+                htmlFor="palette"
+                setting="palette"
+                help={help('Palette', 'The colours. Every palette has a dark and a light mode.')}
+              >
+                <Ui.Select id="palette" defaultValue={theme.palette}>
+                  {themeOptions(theme.config, 'palette').map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </Ui.Select>
+              </Ui.Settings.Row>
+              <Ui.Settings.Row
+                label="Default view"
+                htmlFor="defaultView"
+                setting="defaultView"
+                help={help('Default view', 'The view shown when you open Octotally.')}
+              >
+                <Ui.Select id="defaultView" defaultValue={settings.defaultView}>
+                  {views.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </Ui.Select>
+              </Ui.Settings.Row>
+            </Ui.Section>
+          </Ui.Settings>
+        )}
+      </Ui.Stack>
+    </Ui.AppShell>
   );
 }

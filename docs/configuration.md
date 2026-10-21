@@ -63,10 +63,12 @@ Stored as key → JSON value in the `settings` table, validated by the shared `S
 | `timezone` | `UTC` | IANA timezone for `digestHour` |
 | `digestRealtime` | false | Send a ping right after a poll that found new activity |
 | `discordWebhookUrl` | – | Discord webhook (`https://` only); empty = notifier off |
-| `theme` | `auto` | One of the nine Primer themes, `dark_dracula`, or `auto` to follow the OS |
+| `skin` | `primer` | Any tailor skin id; ids the UI does not ship are ignored |
+| `palette` | `ayu` | Any tailor palette id; ids the UI does not ship are ignored |
+| `mode` | `auto` | `auto` (follow the OS), `dark` or `light` |
 | `defaultView` | `active` | View shown on load |
 | `siblingsMaxAgeMin` | 180 | [Octoforge](octoforge.md#the-app-switcher) only: the app switcher hides once the list Octoforge sent is older than this (three of Octoforge's 60-minute send periods) |
 
 `PUT /api/settings` takes a partial object and changes only the keys present; validation errors
-come back as `400` with every issue in `message` (`pollIntervalMin: Too small…; theme: Invalid
+come back as `400` with every issue in `message` (`pollIntervalMin: Too small…; mode: Invalid
 option…`). `timezone` must be a valid IANA zone.

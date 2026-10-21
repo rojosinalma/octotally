@@ -1,24 +1,29 @@
 # Themes
 
-All nine Primer themes are available: light, light colorblind, light tritanopia, light high
-contrast, dark, dark dimmed, dark colorblind, dark tritanopia, dark high contrast — plus
-**Dracula** (`dark_dracula`) and `auto`, which follows the OS. Pick one in Settings (`theme`) or
-set it with `PUT /api/settings {"theme": "dark_dimmed"}`.
+Octotally is drawn with [tailor](https://github.com/rojosinalma/tailor), so it comes with every tailor
+skin and palette. A skin is a whole design system (Primer, Pico, daisyUI, a terminal look…); a palette
+is the colours. Every palette has a dark and a light mode.
 
-## Adding a theme
+The default is the `primer` skin (the GitHub look), the `ayu` palette and `auto` mode, which follows
+your OS. Change it here:
 
-Primer Primitives ship the nine stock themes; extra themes live in `packages/web/src/themes/` as
-one CSS file each, using the same CSS-variable contract and selector scheme
-(`[data-color-mode="dark"][data-dark-theme="<name>"]` plus the `auto` block), so the app treats
-them exactly like the stock ones:
+- The sun/moon button in the footer switches between dark and light.
+- Settings → Appearance picks the skin and the palette.
+- Over the API: `PUT /api/settings {"skin": "pico", "palette": "nord", "mode": "dark"}`.
 
-1. Add `packages/web/src/themes/<name>.css` with Primer's token names.
-2. Import it in `packages/web/src/theme.tsx`.
-3. Add the name to the `Theme` enum in `packages/shared/src/types.ts` and a label to `THEME_LABELS`.
+The choice is stored with the other settings, so every browser opens with the same look. The browser
+also keeps a copy so the page paints in the right colours before the settings load.
 
-Dark theme names must contain `dark`: Primer React derives `data-color-mode` from the name.
+## Where the files come from
 
-`dark_dracula.css` is generated from `@primer/primitives` `dark.css` with a token-to-
-[Dracula](https://draculatheme.com) palette mapping (OKLab nearest colour with a hand-tuned exact
-map). Do not edit it by hand; regenerate from the palette and replace the file. Details in
-`packages/web/src/themes/README.md`.
+`public/tailor/` (CSS, skins, palettes, icon sprite and the head snippet) and `vendor/tailor-react/`
+(the React components) are copied in by tailor's own tool. They carry a `managed by tailor` header:
+don't edit them by hand. New skins and palettes arrive when they are synced again. The app's own
+styles are in `packages/web/src/app.css` and only use tailor's `--t-*` colour variables, so they follow
+whichever palette is picked.
+
+## Upgrading from 0.3
+
+0.3 had one `theme` setting with the nine Primer themes and Dracula. On the first start of the new
+version it is turned into `mode` (light or dark themes keep their mode, `auto` stays `auto`) and
+`dark_dracula` becomes the `dracula` palette in dark mode. The old key is removed.

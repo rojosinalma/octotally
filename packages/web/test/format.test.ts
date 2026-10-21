@@ -23,11 +23,11 @@ describe('relativeTime', () => {
 describe('activityLine', () => {
   test('commented vs opened vs updated', () => {
     expect(
-      activityLine({ lastActivityBy: 'maziggy', lastActivityAt: ago(7_200_000), commentCount: 3 }, now),
-    ).toBe('maziggy commented 2h ago');
+      activityLine({ lastActivityBy: 'acme-dev', lastActivityAt: ago(7_200_000), commentCount: 3 }, now),
+    ).toBe('acme-dev commented 2h ago');
     expect(
-      activityLine({ lastActivityBy: 'maziggy', lastActivityAt: ago(7_200_000), commentCount: 0 }, now),
-    ).toBe('maziggy opened 2h ago');
+      activityLine({ lastActivityBy: 'acme-dev', lastActivityAt: ago(7_200_000), commentCount: 0 }, now),
+    ).toBe('acme-dev opened 2h ago');
     expect(
       activityLine({ lastActivityBy: null, lastActivityAt: ago(86_400_000), commentCount: 0 }, now),
     ).toBe('updated 1d ago');

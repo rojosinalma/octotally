@@ -1,28 +1,8 @@
-import type { Theme } from '@octotally/shared';
-import {
-  AlertIcon,
-  CommandPaletteIcon,
-  GearIcon,
-  PaintbrushIcon,
-  PersonIcon,
-  SignOutIcon,
-  SyncIcon,
-} from '@primer/octicons-react';
-import {
-  ActionList,
-  ActionMenu,
-  Avatar,
-  Button,
-  IconButton,
-  Header as PrimerHeader,
-  Spinner,
-} from '@primer/react';
-import { Tooltip } from '@primer/react/next';
 import { type ReactNode, useEffect, useState } from 'react';
+import { Ui } from 'tailor-react';
 import { useApp } from '../hooks/useApp';
 import { absoluteTime, relativeTime } from '../lib/format';
 import { linkClick } from '../router';
-import { THEME_LABELS, THEMES } from '../theme';
 import { MemberSwitcher } from './MemberSwitcher';
 
 interface Props {
@@ -31,8 +11,9 @@ interface Props {
   onShowShortcuts: () => void;
 }
 
+/** Navbar content; `Ui.AppShell nav` wraps it in the `.t-navbar` header. */
 export function Header({ search, onShowShortcuts }: Props) {
-  const { status, statusError, refresh, settings, updateSettings, authRequired, logout } = useApp();
+  const { status, statusError, refresh, authRequired, logout } = useApp();
   // Re-render the relative time once a minute.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -49,7 +30,7 @@ export function Header({ search, onShowShortcuts }: Props) {
       : statusError
         ? 'Status unavailable'
         : 'Never synced';
-  const tooltipParts = [
+  const tipParts = [
     status?.lastSyncAt ? `Last sync ${absoluteTime(status.lastSyncAt)}` : null,
     status?.nextSyncAt ? `Next ${relativeTime(status.nextSyncAt)}` : null,
     status?.githubRateRemaining !== null && status?.githubRateRemaining !== undefined
@@ -62,120 +43,89 @@ export function Header({ search, onShowShortcuts }: Props) {
   const login = status?.githubLogin ?? null;
 
   return (
-    <PrimerHeader className="app-header" aria-label="Octotally">
+    <>
       <MemberSwitcher />
-      <PrimerHeader.Item>
-        <PrimerHeader.Link href="/" onClick={linkClick('/')} className="wordmark" aria-label="Octotally home">
-          <svg aria-hidden="true" viewBox="0 0 32 32" width="24" height="24" className="wordmark-mark">
-            <rect x="1" y="1" width="30" height="30" rx="7" fill="var(--fgColor-open)" />
-            <g stroke="var(--fgColor-onEmphasis)" strokeWidth="2.6" strokeLinecap="round" fill="none">
-              <path d="M9 8v16" />
-              <path d="M16 8v16" />
-              <path d="M23 8v16" />
-              <path d="M6 22L26 10" />
-            </g>
-          </svg>
-          <span>Octotally</span>
-        </PrimerHeader.Link>
-      </PrimerHeader.Item>
-      <PrimerHeader.Item full className="header-search">
-        {search}
-      </PrimerHeader.Item>
-      <PrimerHeader.Item>
-        <Tooltip text={tooltipParts.join(' · ') || 'No sync yet'} direction="s">
-          <Button
-            variant="invisible"
-            size="small"
-            className={`status-pill${failed ? ' status-pill-failed' : ''}`}
-            leadingVisual={
-              syncing ? () => <Spinner size="small" srText={null} /> : failed ? AlertIcon : undefined
-            }
-            onClick={() => void refresh()}
-            aria-label={`Sync status: ${statusText}. Click to refresh.`}
-          >
-            {statusText}
-          </Button>
-        </Tooltip>
-      </PrimerHeader.Item>
-      <PrimerHeader.Item>
-        <IconButton
-          icon={SyncIcon}
+      <Ui.Navbar.Brand href="/" onClick={linkClick('/')} aria-label="Octotally home">
+        <img src="/favicon.svg" alt="" width={24} height={24} className="wordmark-mark" />
+        <span>Octotally</span>
+      </Ui.Navbar.Brand>
+      <div className="header-search">{search}</div>
+      <Ui.Navbar.End>
+        <Ui.Button
+          variant="ghost"
+          size="sm"
+          tone={failed ? 'danger' : undefined}
+          className="status-pill"
+          tip={tipParts.join(' · ') || 'No sync yet'}
+          tipAt="bottom"
+          onClick={() => void refresh()}
+          aria-label={`Sync status: ${statusText}. Click to refresh.`}
+        >
+          {syncing ? (
+            <Ui.Spinner size="sm" label={null} />
+          ) : failed ? (
+            <Ui.Icon name="bi-exclamation-triangle" />
+          ) : null}
+          {statusText}
+        </Ui.Button>
+        <Ui.Button
+          variant="ghost"
+          iconOnly
           aria-label="Refresh from GitHub"
-          variant="invisible"
-          keybindingHint="r"
+          tip="Refresh from GitHub (r)"
+          tipAt="bottom"
           disabled={syncing}
           onClick={() => void refresh()}
           className={syncing ? 'spin' : undefined}
-        />
-      </PrimerHeader.Item>
-      <PrimerHeader.Item>
-        <ActionMenu>
-          <ActionMenu.Anchor>
-            <button type="button" className="avatar-button" aria-label="Account menu">
-              {login ? (
-                <Avatar
-                  src={`https://github.com/${encodeURIComponent(login)}.png?size=64`}
-                  alt=""
-                  size={28}
-                />
-              ) : (
-                <PersonIcon size={20} />
-              )}
-            </button>
-          </ActionMenu.Anchor>
-          <ActionMenu.Overlay width="medium" align="end">
-            <ActionList>
-              {login && (
-                <>
-                  <ActionList.Item disabled>
-                    Signed in as <strong>{login}</strong>
-                  </ActionList.Item>
-                  <ActionList.Divider />
-                </>
-              )}
-              <ActionList.Group selectionVariant="single">
-                <ActionList.GroupHeading>
-                  <PaintbrushIcon /> Theme
-                </ActionList.GroupHeading>
-                {THEMES.map((t: Theme) => (
-                  <ActionList.Item
-                    key={t}
-                    selected={settings.theme === t}
-                    onSelect={() => void updateSettings({ theme: t }, { silent: true })}
-                  >
-                    {THEME_LABELS[t]}
-                  </ActionList.Item>
-                ))}
-              </ActionList.Group>
-              <ActionList.Divider />
-              <ActionList.LinkItem href="/settings" onClick={linkClick('/settings')}>
-                <ActionList.LeadingVisual>
-                  <GearIcon />
-                </ActionList.LeadingVisual>
-                Settings
-              </ActionList.LinkItem>
-              <ActionList.Item onSelect={onShowShortcuts}>
-                <ActionList.LeadingVisual>
-                  <CommandPaletteIcon />
-                </ActionList.LeadingVisual>
-                Keyboard shortcuts
-                <ActionList.TrailingVisual>?</ActionList.TrailingVisual>
-              </ActionList.Item>
-              {authRequired && (
-                <>
-                  <ActionList.Divider />
-                  <ActionList.Item onSelect={() => void logout()}>
-                    <ActionList.LeadingVisual>
-                      <SignOutIcon />
-                    </ActionList.LeadingVisual>
-                    Sign out
-                  </ActionList.Item>
-                </>
-              )}
-            </ActionList>
-          </ActionMenu.Overlay>
-        </ActionMenu>
-      </PrimerHeader.Item>
-    </PrimerHeader>
+        >
+          <Ui.Icon name="bi-arrow-repeat" />
+        </Ui.Button>
+        <Ui.Menu
+          align="end"
+          variant="ghost"
+          summaryClassName="avatar-button"
+          trigger={
+            login ? (
+              <Ui.Avatar
+                size="sm"
+                src={`https://github.com/${encodeURIComponent(login)}.png?size=64`}
+                alt="Account menu"
+              />
+            ) : (
+              <Ui.Icon name="bi-person" label="Account menu" />
+            )
+          }
+        >
+          {login && (
+            <>
+              <Ui.Menu.Header>
+                Signed in as <strong>{login}</strong>
+              </Ui.Menu.Header>
+              <Ui.Menu.Divider />
+            </>
+          )}
+          <li>
+            <a className="t-menu-item" role="menuitem" href="/settings" onClick={linkClick('/settings')}>
+              <Ui.Icon name="bi-gear" />
+              Settings
+            </a>
+          </li>
+          <Ui.Menu.Item onSelect={onShowShortcuts}>
+            <Ui.Icon name="bi-keyboard" />
+            Keyboard shortcuts
+            <Ui.Menu.Kbd>?</Ui.Menu.Kbd>
+          </Ui.Menu.Item>
+          {authRequired && (
+            <>
+              <Ui.Menu.Divider />
+              <Ui.Menu.Item onSelect={() => void logout()}>
+                <Ui.Icon name="bi-box-arrow-right" />
+                Sign out
+              </Ui.Menu.Item>
+            </>
+          )}
+        </Ui.Menu>
+      </Ui.Navbar.End>
+    </>
   );
 }

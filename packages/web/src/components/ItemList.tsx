@@ -1,6 +1,6 @@
 import type { Item, SyncStatus } from '@octotally/shared';
-import { SkeletonBox } from '@primer/react';
 import { useEffect, useRef } from 'react';
+import { Ui } from 'tailor-react';
 import type { ApiError, ItemAction } from '../api';
 import { EmptyState } from './EmptyState';
 import { ItemRow } from './ItemRow';
@@ -19,21 +19,13 @@ interface Props {
   onRetry: () => void;
 }
 
-const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
-
-function Skeleton() {
+function Loading() {
   return (
-    <ul className="item-list" aria-busy="true" aria-label="Loading items">
-      {SKELETON_ROWS.map((i) => (
-        <li key={i} className="item-row item-row-skeleton">
-          <SkeletonBox width="16px" height="16px" />
-          <div className="item-main">
-            <SkeletonBox width={`${55 + ((i * 17) % 35)}%`} height="16px" />
-            <SkeletonBox width="40%" height="12px" />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <Ui.Card className="item-list-loading" aria-busy="true">
+      <Ui.EmptyState size="sm" icon={<Ui.Spinner size="lg" label="Loading items" />}>
+        <p>Loading items…</p>
+      </Ui.EmptyState>
+    </Ui.Card>
   );
 }
 
@@ -59,7 +51,7 @@ export function ItemList({
     row?.scrollIntoView({ block: 'nearest' });
   }, [selectedId]);
 
-  if (items === null && loading) return <Skeleton />;
+  if (items === null && loading) return <Loading />;
   if (error && !items) return <EmptyState kind="error" message={error.message} onRetry={onRetry} />;
   if (!items || items.length === 0) {
     // No login, no scheduled sync and nothing stored: the server has no usable GITHUB_TOKEN.
@@ -72,7 +64,12 @@ export function ItemList({
   }
 
   return (
-    <ul ref={listRef} className={`item-list${loading ? ' item-list-refreshing' : ''}`} aria-label="Items">
+    <ul
+      ref={listRef}
+      className={`t-card item-list${loading ? ' item-list-refreshing' : ''}`}
+      aria-label="Items"
+      aria-busy={loading || undefined}
+    >
       {items.map((item) => (
         <ItemRow
           key={item.id}

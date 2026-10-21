@@ -257,7 +257,7 @@ describe('PUT /github', () => {
     const { req, rawRow } = await build();
     const r = await req('/api/settings', {
       method: 'PUT',
-      json: { [DELIVERED_TOKEN_KEY]: 'x', theme: 'light' },
+      json: { [DELIVERED_TOKEN_KEY]: 'x', mode: 'light' },
     });
     expect(r.status).toBe(200);
     expect(await rawRow()).toBeUndefined();

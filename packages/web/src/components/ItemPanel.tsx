@@ -1,20 +1,9 @@
 import type { Activity, Item } from '@octotally/shared';
-import {
-  BellSlashIcon,
-  CheckIcon,
-  CommentIcon,
-  GitCommitIcon,
-  HistoryIcon,
-  LinkExternalIcon,
-  PencilIcon,
-  ReplyIcon,
-  TagIcon,
-} from '@primer/octicons-react';
-import { Dialog, Label, Link, SkeletonBox, StateLabel, Timeline } from '@primer/react';
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { Ui } from 'tailor-react';
 import { type ApiError, api, type ItemAction } from '../api';
 import { useAsync } from '../hooks/useAsync';
-import { cssVar, linkedPrVisual, needsPr, ROLE_LABELS, stateVisual } from '../lib/colors';
+import { linkedPrVisual, needsPr, ROLE_LABELS, stateVisual } from '../lib/colors';
 import { absoluteTime, relativeTime } from '../lib/format';
 
 interface Props {
@@ -23,23 +12,23 @@ interface Props {
   onAction: (item: Item, action: ItemAction) => void;
 }
 
-const ACTIVITY_ICONS: Record<Activity['kind'], ComponentType<{ size?: number }>> = {
-  comment: CommentIcon,
-  review: CheckIcon,
-  commit: GitCommitIcon,
-  state: HistoryIcon,
-  label: TagIcon,
-  edit: PencilIcon,
-  reply: ReplyIcon,
-  other: HistoryIcon,
+const ACTIVITY_ICONS: Record<Activity['kind'], string> = {
+  comment: 'lucide-message-square',
+  review: 'bi-check2',
+  commit: 'lucide-git-commit-horizontal',
+  state: 'lucide-history',
+  label: 'bi-tag',
+  edit: 'bi-pencil',
+  reply: 'bi-reply',
+  other: 'lucide-history',
 };
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="panel-field">
-      <dt className="fg-muted">{label}</dt>
+    <>
+      <dt>{label}</dt>
       <dd>{children}</dd>
-    </div>
+    </>
   );
 }
 
@@ -51,51 +40,59 @@ export function ItemPanel({ item, onClose, onAction }: Props) {
   const error: ApiError | null = detail.error;
 
   return (
-    <Dialog
+    <Ui.Dialog
+      id="item-panel"
+      drawer
+      data-side="right"
+      open
+      size="lg"
       title={item.title}
-      subtitle={
-        <span>
-          {item.repo} #{item.number} · opened by {item.author} {relativeTime(item.createdAt)}
-        </span>
-      }
       onClose={onClose}
-      position="right"
-      width="xlarge"
       className="item-panel"
-      footerButtons={[
-        ...(hidden
-          ? [{ content: 'Restore', leadingVisual: HistoryIcon, onClick: () => onAction(item, 'restore') }]
-          : [
-              { content: 'Mute', leadingVisual: BellSlashIcon, onClick: () => onAction(item, 'mute') },
-              { content: 'Done', leadingVisual: CheckIcon, onClick: () => onAction(item, 'done') },
-            ]),
-        {
-          content: 'Open on GitHub',
-          buttonType: 'primary' as const,
-          leadingVisual: LinkExternalIcon,
-          onClick: () => window.open(item.url, '_blank', 'noopener'),
-        },
-      ]}
+      footer={
+        <>
+          {hidden ? (
+            <Ui.Button onClick={() => onAction(item, 'restore')}>
+              <Ui.Icon name="lucide-history" /> Restore
+            </Ui.Button>
+          ) : (
+            <>
+              <Ui.Button onClick={() => onAction(item, 'mute')}>
+                <Ui.Icon name="bi-bell-slash" /> Mute
+              </Ui.Button>
+              <Ui.Button onClick={() => onAction(item, 'done')}>
+                <Ui.Icon name="bi-check2" /> Done
+              </Ui.Button>
+            </>
+          )}
+          <Ui.Button variant="primary" onClick={() => window.open(item.url, '_blank', 'noopener')}>
+            <Ui.Icon name="bi-box-arrow-up-right" /> Open on GitHub
+          </Ui.Button>
+        </>
+      }
     >
-      <div className="panel-body">
-        <div className="panel-state">
-          <StateLabel status={visual.status} size="small">
+      <Ui.Stack gap="4">
+        <p className="t-muted t-small panel-subtitle">
+          {item.repo} #{item.number} · opened by {item.author} {relativeTime(item.createdAt)}
+        </p>
+        <Ui.Cluster gap="2" align="center">
+          <Ui.StateLabel state={visual.state} size="sm" icon={visual.icon}>
             {visual.label}
-          </StateLabel>
+          </Ui.StateLabel>
           {hidden && (
-            <Label variant={item.hidden === 'done' ? 'done' : 'attention'}>
+            <Ui.Badge tone={item.hidden === 'done' ? 'purple' : 'warning'}>
               {item.hidden === 'done' ? 'Done' : 'Muted'}
-            </Label>
+            </Ui.Badge>
           )}
           {needsPr(item) && (
-            <Label variant="attention">{item.type === 'discussion' ? 'Unanswered' : 'Needs PR'}</Label>
+            <Ui.Badge tone="warning">{item.type === 'discussion' ? 'Unanswered' : 'Needs PR'}</Ui.Badge>
           )}
-        </div>
-        <dl className="panel-fields">
+        </Ui.Cluster>
+        <Ui.Facts>
           <Field label="Repository">
-            <Link href={`https://github.com/${item.repo}`} target="_blank" rel="noreferrer">
+            <a href={`https://github.com/${item.repo}`} target="_blank" rel="noreferrer">
               {item.repo}
-            </Link>
+            </a>
           </Field>
           <Field label="Author">{item.author}</Field>
           <Field label="Your role">
@@ -103,17 +100,21 @@ export function ItemPanel({ item, onClose, onAction }: Props) {
           </Field>
           <Field label="Assignees">{item.assignees.length ? item.assignees.join(', ') : '—'}</Field>
           <Field label="Labels">
-            {item.labels.length
-              ? item.labels.map((l) => (
-                  <Label key={l} variant="secondary" className="item-label">
+            {item.labels.length ? (
+              <Ui.Cluster gap="1">
+                {item.labels.map((l) => (
+                  <Ui.Badge key={l} size="xs" variant="outline">
                     {l}
-                  </Label>
-                ))
-              : '—'}
+                  </Ui.Badge>
+                ))}
+              </Ui.Cluster>
+            ) : (
+              '—'
+            )}
           </Field>
           <Field label="Comments">{item.commentCount}</Field>
           <Field label="Last activity">
-            <span title={absoluteTime(item.lastActivityAt)}>
+            <span data-tip={absoluteTime(item.lastActivityAt)}>
               {relativeTime(item.lastActivityAt)}
               {item.lastActivityBy ? ` by ${item.lastActivityBy}` : ''}
             </span>
@@ -123,27 +124,26 @@ export function ItemPanel({ item, onClose, onAction }: Props) {
               {absoluteTime(item.hiddenAt)}
             </Field>
           )}
-        </dl>
+        </Ui.Facts>
 
         {item.type === 'issue' && (
           <section className="panel-section">
             <h3>Linked pull requests</h3>
             {item.linkedPrs.length === 0 ? (
-              <p className="fg-muted">None yet.</p>
+              <p className="t-muted">None yet.</p>
             ) : (
-              <ul className="linked-prs">
+              <ul className="t-plain-list linked-prs">
                 {item.linkedPrs.map((pr) => {
                   const v = linkedPrVisual(pr);
-                  const PrIcon = v.icon;
                   return (
                     <li key={pr.url}>
-                      <span style={{ color: cssVar(v.color) }}>
-                        <PrIcon aria-label={v.label} size={16} />
+                      <span className="t-tone-text" data-tone={v.tone}>
+                        <Ui.Icon name={v.icon} label={v.label} />
                       </span>{' '}
-                      <Link href={pr.url} target="_blank" rel="noreferrer">
+                      <a href={pr.url} target="_blank" rel="noreferrer">
                         {pr.repo} #{pr.number}
-                      </Link>{' '}
-                      <span className="fg-muted">{pr.state}</span>
+                      </a>{' '}
+                      <span className="t-muted">{pr.state}</span>
                     </li>
                   );
                 })}
@@ -152,46 +152,41 @@ export function ItemPanel({ item, onClose, onAction }: Props) {
           </section>
         )}
 
-        <section className="panel-section">
+        <section className="panel-section" aria-busy={!activity && !error ? true : undefined}>
           <h3>Recent activity</h3>
-          {error && <p className="fg-danger">Could not load activity: {error.message}</p>}
-          {!activity && !error && (
-            <div className="stack">
-              <SkeletonBox height="20px" width="80%" />
-              <SkeletonBox height="20px" width="60%" />
-              <SkeletonBox height="20px" width="70%" />
-            </div>
+          {error && (
+            <p className="t-tone-text" data-tone="danger">
+              Could not load activity: {error.message}
+            </p>
           )}
-          {activity && activity.length === 0 && <p className="fg-muted">No activity recorded yet.</p>}
+          {!activity && !error && (
+            <Ui.Cluster gap="2" align="center">
+              <Ui.Spinner size="sm" label={null} />
+              <span className="t-muted">Loading activity…</span>
+            </Ui.Cluster>
+          )}
+          {activity && activity.length === 0 && <p className="t-muted">No activity recorded yet.</p>}
           {activity && activity.length > 0 && (
-            <Timeline clipSidebar>
-              {activity.map((a) => {
-                const AIcon = ACTIVITY_ICONS[a.kind];
-                return (
-                  <Timeline.Item key={a.id} condensed>
-                    <Timeline.Badge>
-                      <AIcon size={16} />
-                    </Timeline.Badge>
-                    <Timeline.Body>
-                      {a.actor && <strong>{a.actor} </strong>}
-                      {a.url ? (
-                        <Link href={a.url} target="_blank" rel="noreferrer" muted>
-                          {a.summary}
-                        </Link>
-                      ) : (
-                        a.summary
-                      )}{' '}
-                      <span className="fg-muted" title={absoluteTime(a.at)}>
-                        {relativeTime(a.at)}
-                      </span>
-                    </Timeline.Body>
-                  </Timeline.Item>
-                );
-              })}
-            </Timeline>
+            <Ui.Timeline>
+              {activity.map((a) => (
+                <Ui.Timeline.Item key={a.id} condensed badge={<Ui.Icon name={ACTIVITY_ICONS[a.kind]} />}>
+                  {a.actor && <strong>{a.actor} </strong>}
+                  {a.url ? (
+                    <a href={a.url} target="_blank" rel="noreferrer">
+                      {a.summary}
+                    </a>
+                  ) : (
+                    a.summary
+                  )}{' '}
+                  <span className="t-muted" data-tip={absoluteTime(a.at)}>
+                    {relativeTime(a.at)}
+                  </span>
+                </Ui.Timeline.Item>
+              ))}
+            </Ui.Timeline>
           )}
         </section>
-      </div>
-    </Dialog>
+      </Ui.Stack>
+    </Ui.Dialog>
   );
 }

@@ -189,11 +189,11 @@ describe('api routes', () => {
     expect(before.pollIntervalMin).toBe(15);
     const p = await req('/api/settings', { method: 'PUT', json: { pollIntervalMin: 5 } });
     expect(p.body).toMatchObject({ ok: true, settings: { pollIntervalMin: 5, activeWindowDays: 30 } });
-    const bad = await req('/api/settings', { method: 'PUT', json: { pollIntervalMin: 0, theme: 'neon' } });
+    const bad = await req('/api/settings', { method: 'PUT', json: { pollIntervalMin: 0, mode: 'neon' } });
     expect(bad.status).toBe(400);
     expect(bad.body.kind).toBe('validation');
     expect(bad.body.message).toMatch(/pollIntervalMin/);
-    expect(bad.body.message).toMatch(/theme/);
+    expect(bad.body.message).toMatch(/mode/);
     expect((await req('/api/settings', { method: 'PUT', json: { timezone: 'Mars/Olympus' } })).status).toBe(
       400,
     );

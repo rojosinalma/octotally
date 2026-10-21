@@ -26,7 +26,7 @@ export function jsonErr(
   return c.json(body, status ?? STATUS[kind]);
 }
 
-/** Zod issues → one readable line: `pollIntervalMin: Too small; theme: Invalid option`. */
+/** Zod issues → one readable line: `pollIntervalMin: Too small; mode: Invalid option`. */
 export function zodMessage(err: ZodError): string {
   return err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ');
 }

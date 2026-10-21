@@ -1,14 +1,13 @@
-import { Spinner } from '@primer/react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Ui } from 'tailor-react';
 import { api, onAuthError } from './api';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
-import { AppProvider, useApp } from './hooks/useApp';
-import { ToastProvider } from './hooks/useToast';
+import { AppProvider } from './hooks/useApp';
 import { Dashboard } from './pages/Dashboard';
 import { LoginPage } from './pages/Login';
 import { SettingsPage } from './pages/Settings';
 import { useRoute } from './router';
-import { readCachedTheme, ThemeRoot } from './theme';
+import { ThemeSync } from './theme';
 
 type Auth = { state: 'loading' } | { state: 'login' } | { state: 'ready'; required: boolean };
 
@@ -23,16 +22,13 @@ function Routes() {
       ) : (
         <Dashboard onShowShortcuts={show} />
       )}
-      {shortcuts && <ShortcutsDialog onClose={() => setShortcuts(false)} />}
+      <ShortcutsDialog open={shortcuts} onClose={() => setShortcuts(false)} />
     </>
   );
 }
 
-/** Applies the server-side theme once settings arrive; the cached one covers the first paint. */
-function Themed({ children }: { children: ReactNode }) {
-  const { settings, settingsLoaded } = useApp();
-  const theme = settingsLoaded ? settings.theme : readCachedTheme();
-  return <ThemeRoot theme={theme}>{children}</ThemeRoot>;
+function Shell({ children }: { children: ReactNode }) {
+  return <Ui.Provider>{children}</Ui.Provider>;
 }
 
 export function App() {
@@ -55,27 +51,26 @@ export function App() {
 
   if (auth.state === 'loading') {
     return (
-      <ThemeRoot theme={readCachedTheme()}>
+      <Shell>
         <div className="app-loading">
-          <Spinner srText="Loading" />
+          <Ui.Spinner size="lg" />
         </div>
-      </ThemeRoot>
+      </Shell>
     );
   }
   if (auth.state === 'login') {
     return (
-      <ThemeRoot theme={readCachedTheme()}>
+      <Shell>
         <LoginPage onLoggedIn={() => void check()} />
-      </ThemeRoot>
+      </Shell>
     );
   }
   return (
-    <ToastProvider>
+    <Shell>
       <AppProvider authRequired={auth.required} onLoggedOut={() => setAuth({ state: 'login' })}>
-        <Themed>
-          <Routes />
-        </Themed>
+        <ThemeSync />
+        <Routes />
       </AppProvider>
-    </ToastProvider>
+    </Shell>
   );
 }

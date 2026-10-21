@@ -8,6 +8,8 @@
       "!**/node_modules",
       "!**/src/db/migrations",
       "!data",
+      "!public/tailor",
+      "!vendor",
       "!.release-please-manifest.json"
     ]
   },
