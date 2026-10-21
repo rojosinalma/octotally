@@ -3,6 +3,21 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.2.0](https://github.com/rojosinalma/octotally/compare/v0.1.2...v0.2.0) (2026-10-21)
+
+
+### Features
+
+* **db:** adopt another database for Octoforge ([5531f09](https://github.com/rojosinalma/octotally/commit/5531f0953f0cc3c24393ff2ce2dcac604d89e409))
+* **db:** Postgres engine next to SQLite behind one async data layer ([040e2ed](https://github.com/rojosinalma/octotally/commit/040e2ede9403d5133162aade7bc2a3e6db693b95))
+* Octoforge member contract v1 and Postgres support ([c6e770f](https://github.com/rojosinalma/octotally/commit/c6e770f05579709a32dc4957bd5a8071ae814e8e))
+* **octoforge:** member contract v1 manifest and /api/octoforge routes ([9f9149e](https://github.com/rojosinalma/octotally/commit/9f9149e1a4051606f88e5d70f29e4dd5a963790d))
+
+
+### Documentation
+
+* octoforge integration, Postgres support and the new environment variables ([8541159](https://github.com/rojosinalma/octotally/commit/85411594fdb5bf57113f34f32e96c75499a226c0))
+
 ## [0.1.2](https://github.com/rojosinalma/octotally/compare/v0.1.1...v0.1.2) (2026-10-16)
 
 
