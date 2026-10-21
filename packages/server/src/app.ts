@@ -12,6 +12,7 @@ import { errInfo, log } from './log';
 import { apiRoutes } from './routes/api';
 import { authRoutes } from './routes/auth';
 import { healthRoutes } from './routes/health';
+import { type OctoforgeDeps, octoforgeRoutes } from './routes/octoforge';
 import { jsonErr } from './routes/respond';
 
 export interface AppDeps {
@@ -21,6 +22,8 @@ export interface AppDeps {
   poller: Poller;
   tokens: TokenSource;
   sessionSecret: string;
+  /** Octoforge member routes: shared credential store and test seams. */
+  octoforge?: OctoforgeDeps;
 }
 
 /**
@@ -65,6 +68,8 @@ export function createApp(deps: AppDeps) {
 
   app.route('/health', healthRoutes(deps));
   app.route('/auth', authRoutes(deps));
+  // Own bearer (OCTOFORGE_TOKEN), registered before the /api gate so that gate never applies here.
+  app.route('/api/octoforge', octoforgeRoutes(deps));
 
   app.use('/api/*', async (c, next) => {
     if (

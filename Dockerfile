@@ -57,7 +57,7 @@ ENV NODE_ENV=production \
 COPY --from=prod-deps --chown=octotally:octotally /app/node_modules ./node_modules
 COPY --from=prod-deps --chown=octotally:octotally /app/packages/shared/node_modules packages/shared/node_modules
 COPY --from=prod-deps --chown=octotally:octotally /app/packages/server/node_modules packages/server/node_modules
-COPY --chown=octotally:octotally package.json ./
+COPY --chown=octotally:octotally package.json octoforge.json ./
 COPY --chown=octotally:octotally packages/shared/package.json packages/shared/
 COPY --chown=octotally:octotally packages/shared/src packages/shared/src
 COPY --chown=octotally:octotally packages/server/package.json packages/server/
