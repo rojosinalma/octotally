@@ -3,6 +3,16 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.3.0](https://github.com/rojosinalma/octotally/compare/v0.2.0...v0.3.0) (2026-10-21)
+
+
+### Features
+
+* hide the member switcher when the sibling list is old ([a561397](https://github.com/rojosinalma/octotally/commit/a561397f77860ee1649767ac037cd2fef4ee4498))
+* hide the member switcher when the sibling list is old ([0e6c082](https://github.com/rojosinalma/octotally/commit/0e6c082e7a17c14dbd3ecddf7b5ff1cb7bd0613a))
+* member switcher from the Octoforge sibling list ([b3c5644](https://github.com/rojosinalma/octotally/commit/b3c56446e3d514c99ce86a150a8950b019adda2a))
+* member switcher from the Octoforge sibling list ([6458e17](https://github.com/rojosinalma/octotally/commit/6458e17ab23a27350dafb4b6a1e0d1fb393e5d54))
+
 ## [0.2.0](https://github.com/rojosinalma/octotally/compare/v0.1.2...v0.2.0) (2026-10-21)
 
 
