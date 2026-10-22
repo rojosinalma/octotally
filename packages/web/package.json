@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@octotally/shared": "workspace:*",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "tailor-react": "workspace:*",
     "zod": "4.6.7"
   },
