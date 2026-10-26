@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # deps: install every workspace dependency (dev included) for the build stage
 # ---------------------------------------------------------------------------
-FROM oven/bun:1.4.3-slim AS deps
+FROM oven/bun:1.4.4-slim AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages/shared/package.json packages/shared/
@@ -22,7 +22,7 @@ RUN bun run build
 # ---------------------------------------------------------------------------
 # prod-deps: runtime node_modules only
 # ---------------------------------------------------------------------------
-FROM oven/bun:1.4.3-slim AS prod-deps
+FROM oven/bun:1.4.4-slim AS prod-deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages/shared/package.json packages/shared/
@@ -34,7 +34,7 @@ RUN bun install --frozen-lockfile --production
 # ---------------------------------------------------------------------------
 # runtime
 # ---------------------------------------------------------------------------
-FROM oven/bun:1.4.3-slim AS runtime
+FROM oven/bun:1.4.4-slim AS runtime
 
 LABEL org.opencontainers.image.title="Octotally" \
       org.opencontainers.image.description="GitHub involvement tracker: every issue, PR and discussion you are part of, filtered to what still needs you." \
