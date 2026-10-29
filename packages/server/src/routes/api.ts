@@ -1,10 +1,10 @@
-import { applySearch, type Item, SettingsPatch, View } from '@octotally/shared';
+import { applySearch, BulkAction, type Item, SettingsPatch, View } from '@octotally/shared';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppDeps } from '../app';
 import { buildDailyDigest, dispatchDigest, lastDigestAt } from '../lib/digest';
-import { getItem, listActivity, listItems, repoCounts, setHidden } from '../lib/items';
+import { getItem, listActivity, listItems, repoCounts, setHidden, setHiddenMany } from '../lib/items';
 import { notifiers } from '../lib/notifiers';
 import { loadSiblings } from '../lib/octoforge/siblings';
 import { getSettings, getView, listViews, patchSettings } from '../lib/settings';
@@ -52,6 +52,19 @@ export function apiRoutes(deps: AppDeps) {
     const all: Item[] = await listItems(db);
     const items = applySearch(all, q, { settings, me: status.githubLogin ?? undefined });
     return jsonOk(c, 'ok', { items, total: items.length, query: q });
+  });
+
+  // Registered before `/items/:id/...` so `bulk` is never read as an id. Unknown ids → `missing`.
+  app.post('/items/bulk', async (c) => {
+    const parsed = BulkAction.safeParse(await body(c));
+    if (!parsed.success) return jsonErr(c, 'validation', zodMessage(parsed.error));
+    const { ids, action } = parsed.data;
+    const hidden = action === 'mute' ? 'muted' : action === 'done' ? 'done' : 'none';
+    const { items, missing } = await setHiddenMany(db, ids, hidden);
+    const verb =
+      action === 'mute' ? 'muted until new activity' : action === 'done' ? 'marked done' : 'restored';
+    const message = `${items.length} ${items.length === 1 ? 'item' : 'items'} ${verb}`;
+    return jsonOk(c, message, { items, missing });
   });
 
   app.get('/items/:id', async (c) => {

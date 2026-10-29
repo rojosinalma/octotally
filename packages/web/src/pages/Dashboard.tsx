@@ -1,8 +1,9 @@
 import type { Item, View } from '@octotally/shared';
 import { matchesItem, parseSearch, substituteSettings, tokenize } from '@octotally/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Ui } from 'tailor-react';
+import { Ui, useConfirm } from 'tailor-react';
 import { api, type ItemAction } from '../api';
+import { BulkBar } from '../components/BulkBar';
 import { FilterChips } from '../components/FilterChips';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
@@ -19,11 +20,18 @@ import { navigate, useRoute } from '../router';
 const normalize = (q: string) => tokenize(q).join(' ').toLowerCase();
 
 const ACTION_PAST: Record<ItemAction, string> = { mute: 'muted', done: 'marked done', restore: 'restored' };
+const HIDDEN_FOR: Record<ItemAction, Item['hidden']> = { mute: 'muted', done: 'done', restore: 'none' };
+/** Bulk actions on more items than this ask first. */
+const CONFIRM_OVER = 20;
+/** Which items an action applies to: restore only hidden ones, mute/done only visible ones. */
+const appliesTo = (item: Item, action: ItemAction) =>
+  action === 'restore' ? item.hidden !== 'none' : item.hidden === 'none';
 
 export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) {
   const route = useRoute();
   const { settings, settingsLoaded, views, status, refresh } = useApp();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const searchRef = useRef<SearchBarHandle>(null);
 
   const resolveView = useCallback((view: View) => substituteSettings(view.query, settings), [settings]);
@@ -97,6 +105,142 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
       setSelectedId(items[0]?.id ?? null);
   }, [items, selectedId]);
 
+  // Bulk selection (checkboxes). Cleared when the query changes; ids that leave the list drop out.
+  const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const anchor = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `query` resets the selection.
+  useEffect(() => {
+    setChecked(new Set());
+    anchor.current = null;
+  }, [query]);
+  useEffect(() => {
+    if (!items) return;
+    setChecked((prev) => {
+      if (prev.size === 0) return prev;
+      const ids = new Set(items.map((i) => i.id));
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [items]);
+
+  const toggleCheck = useCallback(
+    (id: string, shift: boolean) => {
+      const from = anchor.current;
+      setChecked((prev) => {
+        const next = new Set(prev);
+        const list = items ?? [];
+        const a = from ? list.findIndex((i) => i.id === from) : -1;
+        const z = list.findIndex((i) => i.id === id);
+        if (shift && a >= 0 && z >= 0) {
+          // The range takes the anchor's state (checked → check all, unchecked → uncheck all).
+          const on = prev.has(from as string);
+          for (const i of list.slice(Math.min(a, z), Math.max(a, z) + 1)) {
+            if (on) next.add(i.id);
+            else next.delete(i.id);
+          }
+        } else if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      anchor.current = id;
+    },
+    [items],
+  );
+  const toggleAll = useCallback(() => {
+    setChecked((prev) =>
+      items && prev.size < items.length ? new Set(items.map((i) => i.id)) : new Set<string>(),
+    );
+  }, [items]);
+  const clearChecked = useCallback(() => setChecked(new Set()), []);
+
+  const runBulk = useCallback(
+    async (action: ItemAction) => {
+      const before = itemsState.data;
+      if (!before || bulkBusy) return;
+      const targets = before.filter((i) => checked.has(i.id) && appliesTo(i, action));
+      if (targets.length === 0) return;
+      if (targets.length > CONFIRM_OVER) {
+        const verb = action === 'done' ? 'Mark' : action === 'mute' ? 'Mute' : 'Restore';
+        const ok = await confirm(
+          `${verb} ${targets.length} items${action === 'done' ? ' done' : ''}?`,
+          action === 'restore'
+            ? 'They come back into the views that match them.'
+            : 'They leave the views that show only open work. You can restore them from the Hidden view.',
+          { label: `${verb} ${targets.length}` },
+        );
+        if (!ok) return;
+      }
+      const parsed = parseSearch(query);
+      const now = new Date().toISOString();
+      const nextHidden = HIDDEN_FOR[action];
+      const ids = new Set(targets.map((i) => i.id));
+      const optimistic = (i: Item): Item => ({
+        ...i,
+        hidden: nextHidden,
+        hiddenAt: nextHidden === 'none' ? null : now,
+      });
+      const keepIds = new Set(targets.filter((i) => matchesItem(parsed, optimistic(i))).map((i) => i.id));
+      // Move the cursor off rows that disappear.
+      if (selectedId && ids.has(selectedId) && !keepIds.has(selectedId)) {
+        const idx = before.findIndex((i) => i.id === selectedId);
+        const next =
+          before.slice(idx + 1).find((i) => !ids.has(i.id) || keepIds.has(i.id)) ??
+          [...before.slice(0, idx)].reverse().find((i) => !ids.has(i.id) || keepIds.has(i.id)) ??
+          null;
+        setSelectedId(next?.id ?? null);
+      }
+      if (panelId && ids.has(panelId) && !keepIds.has(panelId)) setPanelId(null);
+      itemsState.setData((list) =>
+        list
+          ? list
+              .filter((i) => !ids.has(i.id) || keepIds.has(i.id))
+              .map((i) => (ids.has(i.id) ? optimistic(i) : i))
+          : list,
+      );
+      setChecked(new Set());
+      setAnnouncement(`${targets.length} ${targets.length === 1 ? 'item' : 'items'} ${ACTION_PAST[action]}`);
+      setBulkBusy(true);
+      try {
+        const r = await api.bulkAction([...ids], action);
+        const byId = new Map(r.items.map((i) => [i.id, i]));
+        itemsState.setData((list) => (list ? list.map((i) => byId.get(i.id) ?? i) : list));
+        if (r.missing.length > 0) {
+          toast(`${r.missing.length} ${r.missing.length === 1 ? 'item was' : 'items were'} not found`, {
+            description: 'They may have been removed meanwhile; the list is reloaded.',
+            variant: 'warning',
+          });
+          void itemsState.reload();
+        }
+        void loadCounts();
+        void reposState.reload();
+      } catch (e) {
+        itemsState.setData(before);
+        setChecked(ids);
+        toast(`Could not ${action} ${targets.length} items`, {
+          description: (e as Error).message,
+          variant: 'critical',
+        });
+      } finally {
+        setBulkBusy(false);
+      }
+    },
+    [
+      itemsState.data,
+      itemsState.setData,
+      itemsState.reload,
+      reposState.reload,
+      bulkBusy,
+      checked,
+      confirm,
+      query,
+      selectedId,
+      panelId,
+      toast,
+      loadCounts,
+    ],
+  );
+
   const move = (delta: number) => {
     if (!items?.length) return;
     const idx = Math.max(
@@ -113,7 +257,7 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
   const runAction = useCallback(
     async (item: Item, action: ItemAction) => {
       const parsed = parseSearch(query);
-      const nextHidden = action === 'mute' ? 'muted' : action === 'done' ? 'done' : 'none';
+      const nextHidden = HIDDEN_FOR[action];
       const optimistic: Item = {
         ...item,
         hidden: nextHidden,
@@ -139,12 +283,6 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
       try {
         const r = await api.itemAction(item.id, action);
         itemsState.setData((list) => (list ? list.map((i) => (i.id === item.id ? r.item : i)) : list));
-        toast(
-          `${ACTION_PAST[action].charAt(0).toUpperCase()}${ACTION_PAST[action].slice(1)}: ${item.title}`,
-          {
-            ttlMs: 2500,
-          },
-        );
         void loadCounts();
       } catch (e) {
         itemsState.setData(before);
@@ -153,6 +291,12 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
     },
     [query, itemsState.data, itemsState.setData, selectedId, panelId, toast, loadCounts],
   );
+
+  /** e / m / u: the checked items when there are any, else the focused one. */
+  const act = (action: ItemAction) => {
+    if (checked.size > 0) void runBulk(action);
+    else if (selected && appliesTo(selected, action)) void runAction(selected, action);
+  };
 
   const openSelected = () => {
     if (selected) window.open(selected.url, '_blank', 'noopener');
@@ -178,9 +322,15 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
       if (!panelItem && selected && document.activeElement?.closest('.item-list')) openSelected();
     },
     x: () => selected && setPanelId(selected.id),
-    e: () => selected && selected.hidden === 'none' && void runAction(selected, 'done'),
-    m: () => selected && selected.hidden === 'none' && void runAction(selected, 'mute'),
-    u: () => selected && selected.hidden !== 'none' && void runAction(selected, 'restore'),
+    e: () => act('done'),
+    m: () => act('mute'),
+    u: () => act('restore'),
+    s: () => selected && toggleCheck(selected.id, false),
+    S: () => selected && toggleCheck(selected.id, true),
+    A: () => toggleAll(),
+    Escape: () => {
+      if (!panelItem && checked.size > 0) clearChecked();
+    },
     r: () => void refresh(),
     '/': (e) => {
       e.preventDefault();
@@ -219,9 +369,20 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
       <h1 className="t-visually-hidden">Items</h1>
       <Ui.Stack gap="2" className="dashboard-main">
         <FilterChips query={query} onChange={setQuery} />
-        <div className="list-summary t-small t-muted" aria-live="polite">
-          {items ? `${items.length} ${items.length === 1 ? 'item' : 'items'}` : ''}
-        </div>
+        {items && items.length > 0 ? (
+          <BulkBar
+            items={items}
+            checked={checked}
+            busy={bulkBusy}
+            onToggleAll={toggleAll}
+            onAction={(a) => void runBulk(a)}
+            onClear={clearChecked}
+          />
+        ) : (
+          <div className="list-summary t-small t-muted" aria-live="polite">
+            {items ? '0 items' : ''}
+          </div>
+        )}
         <ItemList
           items={items}
           loading={itemsState.loading}
@@ -229,6 +390,8 @@ export function Dashboard({ onShowShortcuts }: { onShowShortcuts: () => void }) 
           status={status}
           query={query}
           selectedId={selectedId}
+          checked={checked}
+          onCheck={toggleCheck}
           onSelect={setSelectedId}
           onOpenPanel={setPanelId}
           onAction={(item, action) => void runAction(item, action)}

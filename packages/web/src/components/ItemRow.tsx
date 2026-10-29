@@ -8,12 +8,22 @@ import { absoluteTime, activityLine } from '../lib/format';
 interface Props {
   item: Item;
   selected: boolean;
+  checked: boolean;
+  onCheck: (shift: boolean) => void;
   onSelect: () => void;
   onOpenPanel: () => void;
   onAction: (action: ItemAction) => void;
 }
 
-export const ItemRow = memo(function ItemRow({ item, selected, onSelect, onOpenPanel, onAction }: Props) {
+export const ItemRow = memo(function ItemRow({
+  item,
+  selected,
+  checked,
+  onCheck,
+  onSelect,
+  onOpenPanel,
+  onAction,
+}: Props) {
   const visual = stateVisual(item);
   const hidden = item.hidden !== 'none';
   const needs = needsPr(item);
@@ -24,9 +34,10 @@ export const ItemRow = memo(function ItemRow({ item, selected, onSelect, onOpenP
       className="item-row"
       aria-current={selected ? 'true' : undefined}
       data-hidden={hidden ? '' : undefined}
+      data-checked={checked ? '' : undefined}
       data-item-id={item.id}
       onClick={(e) => {
-        if ((e.target as HTMLElement).closest('a, button')) return;
+        if ((e.target as HTMLElement).closest('a, button, label, input')) return;
         onSelect();
         onOpenPanel();
       }}
@@ -40,6 +51,20 @@ export const ItemRow = memo(function ItemRow({ item, selected, onSelect, onOpenP
       onFocus={onSelect}
       tabIndex={selected ? 0 : -1}
     >
+      <label className="item-check" data-tip={checked ? 'Unselect' : 'Select (shift: range)'}>
+        <input
+          type="checkbox"
+          className="t-check-input"
+          checked={checked}
+          tabIndex={-1}
+          onChange={() => undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCheck(e.shiftKey);
+          }}
+        />
+        <span className="t-visually-hidden">Select {item.title}</span>
+      </label>
       <span className="item-icon t-tone-text" data-tone={visual.tone} data-tip={visual.label}>
         <Ui.Icon name={visual.icon} label={visual.label} />
       </span>

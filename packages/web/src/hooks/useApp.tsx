@@ -14,8 +14,8 @@ export interface AppState {
   settings: Settings;
   settingsLoaded: boolean;
   /**
-   * Optimistic patch; reverts on failure. Toasts the outcome unless `silent` (no success toast) or
-   * `quiet` (no toast at all: the caller reports it, e.g. a settings row).
+   * Optimistic patch; reverts on failure. Toasts only a failure, unless `quiet` (the caller reports
+   * it, e.g. a settings row). `silent` is kept for callers; success never toasts.
    */
   updateSettings: (
     patch: SettingsPatch,
@@ -79,7 +79,6 @@ export function AppProvider({
       try {
         const r = await api.patchSettings(patch);
         setSettings(r.settings);
-        if (!opts.silent && !opts.quiet) toast('Settings saved');
         return { ok: true, message: 'Saved' };
       } catch (e) {
         setSettings(previous);
@@ -99,7 +98,6 @@ export function AppProvider({
     try {
       await api.refresh();
       statusState.setData((s) => (s ? { ...s, syncing: true } : s));
-      toast('Sync started', { variant: 'info', ttlMs: 2500 });
       window.setTimeout(() => void statusState.reload(), 1000);
     } catch (e) {
       toast('Refresh failed', { description: (e as Error).message, variant: 'critical' });

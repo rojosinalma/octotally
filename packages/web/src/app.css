@@ -333,3 +333,36 @@
   gap: var(--t-space-2);
   margin: 0;
 }
+
+/* Bulk selection ---------------------------------------------------------- */
+.bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+  min-height: 2.25rem;
+  padding: var(--t-space-1) var(--t-space-3);
+  background: var(--t-canvas);
+}
+.bulk-bar[data-active] {
+  background: color-mix(in srgb, var(--t-accent) var(--t-tint-weak), var(--t-canvas));
+  border-radius: var(--t-radius-md);
+}
+.bulk-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+}
+.item-check {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding-top: 2px;
+  cursor: pointer;
+}
+.item-row[data-checked] {
+  background: color-mix(in srgb, var(--t-accent) var(--t-tint-weak), transparent);
+}

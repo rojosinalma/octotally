@@ -181,6 +181,36 @@ Bun.serve({
       const result = applySearch(items, q, { settings, me: 'acme-dev' });
       return ok('ok', { items: result, total: result.length, query: q });
     }
+    if (p === '/api/items/bulk' && m === 'POST') {
+      const b = (await req.json().catch(() => ({}))) as { ids?: unknown; action?: unknown };
+      const ids = Array.isArray(b.ids)
+        ? b.ids.filter((x): x is string => typeof x === 'string' && x !== '')
+        : [];
+      if (ids.length < 1 || ids.length > 1000) return err('ids: 1..1000 ids required', 'validation', 400);
+      if (b.action !== 'mute' && b.action !== 'done' && b.action !== 'restore')
+        return err('action: must be mute, done or restore', 'validation', 400);
+      const hidden: Item['hidden'] = b.action === 'mute' ? 'muted' : b.action === 'done' ? 'done' : 'none';
+      const hiddenAt = hidden === 'none' ? null : new Date().toISOString();
+      const updated: Item[] = [];
+      const missing: string[] = [];
+      for (const id of new Set(ids)) {
+        const item = items.find((i) => i.id === id);
+        if (!item) {
+          missing.push(id);
+          continue;
+        }
+        item.hidden = hidden;
+        item.hiddenAt = hiddenAt;
+        item.mutedActivityAt = hidden === 'muted' ? item.lastActivityAt : null;
+        updated.push(item);
+      }
+      const verb =
+        hidden === 'muted' ? 'muted until new activity' : hidden === 'done' ? 'marked done' : 'restored';
+      return ok(`${updated.length} ${updated.length === 1 ? 'item' : 'items'} ${verb}`, {
+        items: updated,
+        missing,
+      });
+    }
     const itemMatch = /^\/api\/items\/([^/]+)(?:\/(mute|done|restore))?$/.exec(p);
     if (itemMatch) {
       const item = items.find((i) => i.id === decodeURIComponent(itemMatch[1] as string));

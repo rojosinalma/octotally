@@ -80,10 +80,8 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
     try {
       if (dialog.mode === 'create') {
         await api.createView(name.trim(), viewQuery.trim());
-        toast(`View "${name.trim()}" saved`);
       } else {
         await api.updateView(dialog.view.id, { name: name.trim(), query: viewQuery.trim() });
-        toast('View updated');
       }
       await reloadViews();
       setDialog(null);
@@ -106,7 +104,6 @@ export function Sidebar({ query, onQuery, activeViewId, viewCounts, repos, items
     try {
       await api.deleteView(view.id);
       await reloadViews();
-      toast(`View "${view.name}" deleted`);
       setDialog(null);
     } catch (e) {
       toast('Could not delete view', { description: (e as Error).message, variant: 'critical' });

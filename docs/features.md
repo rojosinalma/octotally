@@ -22,7 +22,11 @@ decide it is done.
 - **Done** and **Mute** per item; a muted item comes back by itself when new activity arrives
 - Item panel with the latest activity, labels, assignees and linked PRs
 - Discord digest: daily at a chosen hour and/or near-real-time pings ([notifications.md](notifications.md))
-- Keyboard first: `j`/`k` move, `e` done, `m` mute, `o` open on GitHub, `/` search, `?` help
+- **Bulk actions**: a checkbox on every row (Shift+click checks a range) and a select-all box above
+  the list; the bar shows Done, Mute, Restore and Clear for the checked items. More than 20 items ask
+  first
+- Toasts only for failures and warnings; a successful action just updates the list
+- Keyboard first: `j`/`k` move, `e` done, `m` mute, `o` open on GitHub, `/` search, `?` help, `s` / `Shift+A` select, `Esc` clears the selection
 - Every [tailor](https://github.com/rojosinalma/tailor) skin and palette, in dark and light; the GitHub look (`primer` skin) by default, following the OS ([themes.md](themes.md))
 - JSON API for scripts and agents ([api.md](api.md)), `/health` for monitors ([operations.md](operations.md))
 - Rate-limit aware poller with backoff; cached data is served while GitHub is down

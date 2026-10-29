@@ -1,6 +1,6 @@
 import type { Activity, Hidden, Item } from '@octotally/shared';
 import { Item as ItemSchema } from '@octotally/shared';
-import { count, desc, eq, gt } from 'drizzle-orm';
+import { count, desc, eq, gt, inArray } from 'drizzle-orm';
 import type { Db, schema } from '../db';
 
 type ItemRow = typeof schema.items.$inferSelect;
@@ -72,6 +72,43 @@ export async function setHidden(db: Db, id: string, hidden: Hidden, now = new Da
     })
     .where(eq(db.t.items.id, id));
   return getItem(db, id);
+}
+
+/**
+ * Bulk mute / done / restore in one transaction, same per-row semantics as `setHidden`. Returns the
+ * updated items in input order (deduped) and the ids that do not exist.
+ */
+export async function setHiddenMany(
+  db: Db,
+  ids: string[],
+  hidden: Hidden,
+  now = new Date(),
+): Promise<{ items: Item[]; missing: string[] }> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return { items: [], missing: [] };
+  const iso = now.toISOString();
+  return db.transaction(async (tx) => {
+    const t = tx.t.items;
+    const rows = await tx.orm.select().from(t).where(inArray(t.id, unique));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const items: Item[] = [];
+    const missing: string[] = [];
+    for (const id of unique) {
+      const r = byId.get(id);
+      if (!r) {
+        missing.push(id);
+        continue;
+      }
+      const patch = {
+        hidden,
+        hiddenAt: hidden === 'none' ? null : iso,
+        mutedActivityAt: hidden === 'muted' ? r.lastActivityAt : null,
+      };
+      await tx.orm.update(t).set(patch).where(eq(t.id, id));
+      items.push(rowToItem({ ...r, ...patch }));
+    }
+    return { items, missing };
+  });
 }
 
 export async function repoCounts(db: Db): Promise<{ repo: string; count: number }[]> {

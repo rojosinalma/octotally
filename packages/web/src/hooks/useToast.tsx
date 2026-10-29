@@ -12,7 +12,10 @@ const TONES = { success: 'success', info: 'info', warning: 'warning', critical: 
 const DEFAULT_TTL_MS = 2500;
 const CRITICAL_TTL_MS = 6000;
 
-/** App toasts on the tailor toast layer (`Ui.Provider`): title plus an optional reason. */
+/**
+ * App toasts on the tailor toast layer (`Ui.Provider`): title plus an optional reason.
+ * Toast only what failed or needs attention; a success shows in place (button state, list update).
+ */
 export function useToast(): ToastApi {
   const { toast: show } = useToasts();
   const toast = useCallback<ToastApi['toast']>(

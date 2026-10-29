@@ -195,11 +195,20 @@ export type SettingsResponse = ApiOk<{ settings: Settings }>;
 export type StatusResponse = ApiOk<{ status: SyncStatus }>;
 export type ReposResponse = ApiOk<{ repos: { repo: string; count: number }[] }>;
 
+/** Bulk mute / done / restore: `POST /api/items/bulk`. */
+export const BulkAction = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(1000),
+  action: z.enum(['mute', 'done', 'restore']),
+});
+export type BulkAction = z.infer<typeof BulkAction>;
+export type BulkResponse = ApiOk<{ items: Item[]; missing: string[] }>;
+
 /** Routes other code depends on. Changing a shape is a breaking change (major bump). */
 export const API_ROUTES = {
   health: '/health',
   items: '/api/items',
   item: (id: string) => `/api/items/${encodeURIComponent(id)}`,
+  itemsBulk: '/api/items/bulk',
   mute: (id: string) => `/api/items/${encodeURIComponent(id)}/mute`,
   done: (id: string) => `/api/items/${encodeURIComponent(id)}/done`,
   restore: (id: string) => `/api/items/${encodeURIComponent(id)}/restore`,
