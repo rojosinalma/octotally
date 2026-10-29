@@ -158,6 +158,47 @@ describe('api routes', () => {
     expect(one.body).toMatchObject({ ok: true, item: { id }, activity: [] });
   });
 
+  test('bulk mute / done / restore', async () => {
+    const { req, syncer } = await build();
+    await syncer.run();
+    const a = 'I_kwDOAbCdEf5xyz001';
+    const b = 'PR_kwDOAbCdEf5abc001';
+    const bulk = (json: unknown) => req('/api/items/bulk', { method: 'POST', json });
+    const d = await bulk({ ids: [a, b, a, 'nope'], action: 'done' });
+    expect(d.status).toBe(200);
+    expect(d.body).toMatchObject({ ok: true, message: '2 items marked done', missing: ['nope'] });
+    const di = d.body.items as Record<string, unknown>[];
+    expect(di.map((i) => i.id)).toEqual([a, b]);
+    expect(di.every((i) => i.hidden === 'done' && i.hiddenAt !== null && i.mutedActivityAt === null)).toBe(
+      true,
+    );
+    expect((await req('/api/items?q=hidden:done')).body.total).toBe(2);
+    const m = await bulk({ ids: [a], action: 'mute' });
+    expect(m.body).toMatchObject({ message: '1 item muted until new activity', missing: [] });
+    const mi = must((m.body.items as Record<string, unknown>[])[0]);
+    expect(mi.hidden).toBe('muted');
+    expect(mi.mutedActivityAt).toBe(mi.lastActivityAt as string);
+    expect(mi.mutedActivityAt).not.toBeNull();
+    const r = await bulk({ ids: [a, b], action: 'restore' });
+    expect(r.body).toMatchObject({
+      message: '2 items restored',
+      items: [
+        { id: a, hidden: 'none', hiddenAt: null, mutedActivityAt: null },
+        { id: b, hidden: 'none', hiddenAt: null },
+      ],
+    });
+    expect((await req('/api/items?q=hidden:none')).body.total).toBe(4);
+    for (const bad of [
+      { ids: [], action: 'done' },
+      { ids: [a], action: 'archive' },
+      { ids: Array.from({ length: 1001 }, (_, i) => `x${i}`), action: 'done' },
+    ]) {
+      const res = await bulk(bad);
+      expect(res.status).toBe(400);
+      expect(res.body.kind).toBe('validation');
+    }
+  });
+
   test('views: list, create, rename builtin, refuse builtin query edit/delete, delete custom', async () => {
     const { req } = await build();
     expect(((await req('/api/views')).body.views as unknown[]).length).toBe(BUILTIN_VIEWS.length);

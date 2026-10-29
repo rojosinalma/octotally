@@ -76,6 +76,8 @@ export const api = {
     ),
   item: (id: string) => request<{ item: Item; activity: Activity[] }>(API_ROUTES.item(id)),
   itemAction: (id: string, action: ItemAction) => post<{ item: Item }>(API_ROUTES[action](id)),
+  bulkAction: (ids: string[], action: ItemAction) =>
+    post<{ items: Item[]; missing: string[] }>(API_ROUTES.itemsBulk, { ids, action }),
   refresh: () => post<{ status?: SyncStatus }>(API_ROUTES.refresh),
   status: () => request<{ status: SyncStatus }>(API_ROUTES.status),
   views: () => request<{ views: View[] }>(API_ROUTES.views),

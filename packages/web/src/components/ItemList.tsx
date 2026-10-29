@@ -12,6 +12,8 @@ interface Props {
   status: SyncStatus | null;
   query: string;
   selectedId: string | null;
+  checked: ReadonlySet<string>;
+  onCheck: (id: string, shift: boolean) => void;
   onSelect: (id: string) => void;
   onOpenPanel: (id: string) => void;
   onAction: (item: Item, action: ItemAction) => void;
@@ -36,6 +38,8 @@ export function ItemList({
   status,
   query,
   selectedId,
+  checked,
+  onCheck,
   onSelect,
   onOpenPanel,
   onAction,
@@ -75,6 +79,8 @@ export function ItemList({
           key={item.id}
           item={item}
           selected={item.id === selectedId}
+          checked={checked.has(item.id)}
+          onCheck={(shift) => onCheck(item.id, shift)}
           onSelect={() => onSelect(item.id)}
           onOpenPanel={() => onOpenPanel(item.id)}
           onAction={(action) => onAction(item, action)}

@@ -26,6 +26,7 @@ Changes to these routes are additive; a breaking change bumps the major version.
 | `POST` | `/api/items/:id/mute` | Hide until new activity |
 | `POST` | `/api/items/:id/done` | Hide permanently (until restored) |
 | `POST` | `/api/items/:id/restore` | Unhide |
+| `POST` | `/api/items/bulk` | Mute / done / restore many items at once |
 | `POST` | `/api/refresh` | Poll GitHub now |
 | `GET` | `/api/status` | Last sync, next sync, rate limit, item count |
 | `GET` `POST` | `/api/views` | List views / create a custom view |
@@ -77,6 +78,11 @@ sees newer activity flips it back to `none`.
 ### `POST /api/items/:id/restore` → `{ok, message, item}` — `hidden:"none"`.
 
 `:id` is the GitHub GraphQL node id (`Item.id`). Unknown id → 404.
+
+### `POST /api/items/bulk` → `{ok, message, items: Item[], missing: string[]}`
+Body `{ids: string[], action: "mute"|"done"|"restore"}`, 1..1000 ids. One transaction, same
+per-item semantics as the single routes. Duplicate ids count once; `items` keeps input order.
+Unknown ids go into `missing` (not an error). Bad body → 400 `validation`.
 
 ## Sync
 

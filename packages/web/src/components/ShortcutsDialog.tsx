@@ -4,13 +4,15 @@ const SHORTCUTS: [string, string][] = [
   ['j / k', 'Move selection down / up'],
   ['o / Enter', 'Open selected item on GitHub'],
   ['x', 'Open the details panel for the selected item'],
-  ['e', 'Mark selected item done'],
-  ['m', 'Mute selected item'],
-  ['u', 'Restore a muted or done item'],
+  ['s', 'Select or unselect the item (Shift+S: range)'],
+  ['Shift+A', 'Select all items / unselect all'],
+  ['e', 'Mark done (selected items, else the current one)'],
+  ['m', 'Mute (selected items, else the current one)'],
+  ['u', 'Restore (selected items, else the current one)'],
   ['/', 'Focus the search bar'],
   ['r', 'Refresh from GitHub'],
   ['?', 'Show this help'],
-  ['Esc', 'Close panel or dialog'],
+  ['Esc', 'Close panel or dialog, else clear the selection'],
 ];
 
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

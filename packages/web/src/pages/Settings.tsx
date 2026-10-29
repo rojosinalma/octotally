@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type SaveResult, themeOptions, Ui, useTailorTheme } from 'tailor-react';
 import { api } from '../api';
 import { Footer } from '../components/Footer';
@@ -29,6 +29,9 @@ const TIMEZONES: string[] = (() => {
 })();
 
 /** Help popover of a settings row. */
+/** How long the test button shows "Sent" after a successful test. */
+const SENT_MS = 2500;
+
 const help = (label: string, text: ReactNode) => ({ label: `About ${label.toLowerCase()}`, children: text });
 
 export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void }) {
@@ -36,6 +39,9 @@ export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void 
   const { toast } = useToast();
   const theme = useTailorTheme();
   const [testing, setTesting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const sentTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(sentTimer.current), []);
   const [reveal, setReveal] = useState(false);
 
   const save = async (key: string, value: string): Promise<SaveResult> => {
@@ -48,7 +54,9 @@ export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void 
     setTesting(true);
     try {
       await api.testNotifier('discord');
-      toast('Test message sent to Discord');
+      setSent(true);
+      window.clearTimeout(sentTimer.current);
+      sentTimer.current = window.setTimeout(() => setSent(false), SENT_MS);
     } catch (e) {
       toast('Test failed', { description: (e as Error).message, variant: 'critical' });
     } finally {
@@ -242,7 +250,15 @@ export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void 
                     disabled={!settings.discordWebhookUrl}
                     onClick={() => void sendTest()}
                   >
-                    <Ui.Icon name="bi-send" /> Send test message
+                    {sent ? (
+                      <>
+                        <Ui.Icon name="bi-check2" /> Sent
+                      </>
+                    ) : (
+                      <>
+                        <Ui.Icon name="bi-send" /> Send test message
+                      </>
+                    )}
                   </Ui.Button>
                 </div>
               </Ui.Settings.Row>
