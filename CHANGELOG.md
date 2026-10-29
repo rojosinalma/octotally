@@ -3,6 +3,13 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.5.0](https://github.com/rojosinalma/octotally/compare/v0.4.0...v0.5.0) (2026-10-29)
+
+
+### Features
+
+* bulk select items; toasts only for failures ([#18](https://github.com/rojosinalma/octotally/issues/18)) ([18272c6](https://github.com/rojosinalma/octotally/commit/18272c6701012f7170cba818b071c40354605bb4))
+
 ## [0.4.0](https://github.com/rojosinalma/octotally/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 
