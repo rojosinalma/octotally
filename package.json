@@ -7,7 +7,7 @@
   "repository": "github:rojosinalma/octotally",
   "workspaces": [
     "packages/*",
-    "vendor/tailor-react"
+    "vendor/tailor"
   ],
   "scripts": {
     "dev": "bun run --filter './packages/*' dev",

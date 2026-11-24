@@ -1,382 +1,333 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { type SaveResult, themeOptions, Ui, useTailorTheme } from 'tailor-react';
+import type { Settings as AppSettings, View } from '@octotally/shared';
+import { useState } from 'react';
+import {
+  Button,
+  Combobox,
+  Fact,
+  Facts,
+  Icon,
+  NumberField,
+  Page,
+  RelativeTime,
+  Secret,
+  Select,
+  Skeleton,
+  StateLabel,
+  Switch,
+  useTheme,
+  useToast,
+} from 'tailor/core';
+import { Duration, Setting, Settings, SettingsSection, useAutoSave } from 'tailor/forms';
 import { api } from '../api';
-import { Footer } from '../components/Footer';
-import { Header } from '../components/Header';
-import { useApp } from '../hooks/useApp';
-import { useToast } from '../hooks/useToast';
-import { absoluteTime, relativeTime } from '../lib/format';
 import { parseSetting, type SettingKey } from '../lib/settings';
-import { linkClick } from '../router';
+import { useSettings, useStatus, useUpdateSettings, useViews } from '../queries';
 
 const SECTIONS = [
-  ['token', 'GitHub token'],
-  ['sync', 'Sync'],
-  ['digest', 'Discord digest'],
-  ['appearance', 'Appearance'],
-] as const;
+  { id: 'token', label: 'GitHub', icon: <Icon name="bi:github" /> },
+  { id: 'sync', label: 'Sync', icon: <Icon name="bi:arrow-repeat" /> },
+  { id: 'digest', label: 'Discord digest', icon: <Icon name="bi:send" /> },
+  { id: 'appearance', label: 'Appearance', icon: <Icon name="bi:palette" /> },
+];
 
 const TIMEZONES: string[] = (() => {
   try {
-    return (
-      (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.(
-        'timeZone',
-      ) ?? ['UTC']
-    );
+    return Intl.supportedValuesOf('timeZone');
   } catch {
     return ['UTC'];
   }
 })();
 
-/** Help popover of a settings row. */
-/** How long the test button shows "Sent" after a successful test. */
-const SENT_MS = 2500;
+const HOURS = Array.from({ length: 24 }, (_, h) => ({
+  value: String(h),
+  label: `${String(h).padStart(2, '0')}:00`,
+}));
 
-const help = (label: string, text: ReactNode) => ({ label: `About ${label.toLowerCase()}`, children: text });
+const MODES = [
+  { value: 'auto', label: 'Same as the device' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+];
 
-export function SettingsPage({ onShowShortcuts }: { onShowShortcuts: () => void }) {
-  const { settings, settingsLoaded, updateSettings, status, views } = useApp();
-  const { toast } = useToast();
-  const theme = useTailorTheme();
-  const [testing, setTesting] = useState(false);
-  const [sent, setSent] = useState(false);
-  const sentTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(sentTimer.current), []);
-  const [reveal, setReveal] = useState(false);
+/** Text saves a moment after the last key; a choice or a switch saves at once. */
+const TEXT_DELAY_MS = 800;
 
-  const save = async (key: string, value: string): Promise<SaveResult> => {
-    const parsed = parseSetting(key as SettingKey, value);
+/** Saves one setting: the value as the row has it, checked by parseSetting. */
+function useSave(key: SettingKey) {
+  const update = useUpdateSettings();
+  return async (value: unknown) => {
+    const parsed = parseSetting(key, value === null || value === undefined ? '' : String(value));
     if ('error' in parsed) return { ok: false, message: parsed.error };
-    return updateSettings(parsed.patch, { quiet: true });
+    return update(parsed.patch);
   };
+}
 
-  const sendTest = async () => {
-    setTesting(true);
-    try {
-      await api.testNotifier('discord');
-      setSent(true);
-      window.clearTimeout(sentTimer.current);
-      sentTimer.current = window.setTimeout(() => setSent(false), SENT_MS);
-    } catch (e) {
-      toast('Test failed', { description: (e as Error).message, variant: 'critical' });
-    } finally {
-      setTesting(false);
-    }
-  };
+function TokenSection() {
+  const { data: status } = useStatus();
+  if (!status) return <Skeleton lines={4} />;
+  return (
+    <Facts>
+      <Fact name="Status">
+        {status.githubLogin ? (
+          <StateLabel tone="success">Connected as {status.githubLogin}</StateLabel>
+        ) : (
+          <StateLabel tone="danger">Not connected: set GITHUB_TOKEN and restart</StateLabel>
+        )}
+      </Fact>
+      <Fact name="Rate limit">
+        {status.githubRateRemaining ?? '—'} requests left
+        {status.githubRateResetAt ? (
+          <>
+            , resets <RelativeTime date={status.githubRateResetAt} />
+          </>
+        ) : null}
+      </Fact>
+      <Fact name="Last sync">
+        {status.syncing ? (
+          'Syncing now'
+        ) : status.lastSyncAt ? (
+          <>
+            <RelativeTime date={status.lastSyncAt} />
+            {status.lastSyncOk === false ? ', failed' : ''}
+          </>
+        ) : (
+          'Never'
+        )}
+      </Fact>
+      <Fact name="Items tracked">{status.itemCount}</Fact>
+      {status.lastError ? <Fact name="Last error">{status.lastError}</Fact> : null}
+    </Facts>
+  );
+}
 
-  const tokenOk = Boolean(status?.githubLogin);
+function TestMessage({ webhook }: { webhook: string }) {
+  const toast = useToast();
+  const [sending, setSending] = useState(false);
+  return (
+    <Button
+      icon={<Icon name="bi:send" />}
+      loading={sending}
+      disabled={!webhook}
+      onClick={async () => {
+        setSending(true);
+        try {
+          await api.testNotifier('discord');
+          toast('success', 'Look in the Discord channel.', { title: 'Test message sent' });
+        } catch (e) {
+          toast('danger', (e as Error).message, { title: 'Test failed' });
+        } finally {
+          setSending(false);
+        }
+      }}
+    >
+      Send test message
+    </Button>
+  );
+}
+
+function ModeRow({ mode: start }: { mode: AppSettings['mode'] }) {
+  const mode = useAutoSave<string>({ value: start, save: useSave('mode') });
+  return (
+    <Setting label="Mode" description="The mode button in the side column sets it too." state={mode}>
+      <Select name="mode" options={MODES} value={mode.value} onValueChange={mode.setValue} />
+    </Setting>
+  );
+}
+
+function Rows({ settings, views }: { settings: AppSettings; views: View[] }) {
+  const theme = useTheme();
+  const activeWindow = useAutoSave<number | null>({
+    value: settings.activeWindowDays,
+    save: useSave('activeWindowDays'),
+  });
+  const poll = useAutoSave<number | null>({
+    value: settings.pollIntervalMin * 60,
+    save: useSave('pollIntervalMin'),
+  });
+  const backoff = useAutoSave<number | null>({
+    value: settings.backoffMaxMin * 60,
+    save: useSave('backoffMaxMin'),
+  });
+  const keep = useAutoSave<number | null>({ value: settings.activityKeep, save: useSave('activityKeep') });
+  const webhook = useAutoSave({
+    value: settings.discordWebhookUrl,
+    save: useSave('discordWebhookUrl'),
+    delay: TEXT_DELAY_MS,
+  });
+  const daily = useAutoSave({ value: settings.digestDaily, save: useSave('digestDaily') });
+  const hour = useAutoSave({ value: String(settings.digestHour), save: useSave('digestHour') });
+  const timezone = useAutoSave<string | null>({ value: settings.timezone, save: useSave('timezone') });
+  const realtime = useAutoSave({ value: settings.digestRealtime, save: useSave('digestRealtime') });
+  const skin = useAutoSave({ value: theme.skin, save: useSave('skin') });
+  const palette = useAutoSave({ value: theme.palette, save: useSave('palette') });
+  const defaultView = useAutoSave({ value: settings.defaultView, save: useSave('defaultView') });
+
+  const labels = theme.config.labels ?? {};
+  const choices = (ids: readonly string[]) => ids.map((id) => ({ value: id, label: labels[id] ?? id }));
+  const zones = TIMEZONES.includes(settings.timezone) ? TIMEZONES : [settings.timezone, ...TIMEZONES];
 
   return (
-    <Ui.AppShell
-      nav={<Header onShowShortcuts={onShowShortcuts} />}
-      side={
-        <Ui.Sidebar label="Settings sections">
-          <Ui.Sidebar.Group>Settings</Ui.Sidebar.Group>
-          {SECTIONS.map(([id, title]) => (
-            <Ui.Sidebar.Item key={id} href={`#${id}`}>
-              {title}
-            </Ui.Sidebar.Item>
-          ))}
-        </Ui.Sidebar>
-      }
-      foot={<Footer />}
-    >
-      <Ui.Page.Header>
-        <Ui.Page.Back href="/" onClick={linkClick('/')} aria-label="Back to items" />
-        <Ui.Page.Title>Settings</Ui.Page.Title>
-        <Ui.Page.Lead>Changes save automatically.</Ui.Page.Lead>
-      </Ui.Page.Header>
+    <Settings sections={SECTIONS}>
+      <SettingsSection id="token" title="GitHub" description="The token Octotally reads GitHub with.">
+        <TokenSection />
+      </SettingsSection>
 
-      <Ui.Stack gap="5" className="settings-page">
-        <Ui.Section title="GitHub token" id="token">
-          {status === null ? (
-            <Ui.Cluster gap="2" align="center" aria-busy="true">
-              <Ui.Spinner size="sm" label={null} />
-              <span className="t-muted">Loading status…</span>
-            </Ui.Cluster>
-          ) : (
-            <Ui.Facts>
-              <dt>Status</dt>
-              <dd>
-                {tokenOk ? (
-                  <span className="t-tone-text" data-tone="success">
-                    <Ui.Icon name="bi-check-circle" /> Connected as <strong>{status.githubLogin}</strong>
-                  </span>
-                ) : (
-                  <span className="t-tone-text" data-tone="danger">
-                    <Ui.Icon name="bi-exclamation-triangle" /> Not connected — set <code>GITHUB_TOKEN</code>{' '}
-                    and restart
-                  </span>
-                )}
-              </dd>
-              <dt>Rate limit</dt>
-              <dd>
-                {status.githubRateRemaining ?? '—'} requests left
-                {status.githubRateResetAt ? `, resets ${relativeTime(status.githubRateResetAt)}` : ''}
-              </dd>
-              <dt>Last sync</dt>
-              <dd>
-                <Ui.Cluster gap="2" align="center">
-                  <span data-tip={absoluteTime(status.lastSyncAt) || undefined}>
-                    {status.lastSyncAt ? relativeTime(status.lastSyncAt) : 'never'}
-                  </span>
-                  {status.lastSyncOk === false && (
-                    <Ui.Badge tone="danger" size="xs">
-                      failed
-                    </Ui.Badge>
-                  )}
-                  {status.syncing && (
-                    <Ui.Badge tone="accent" size="xs">
-                      syncing
-                    </Ui.Badge>
-                  )}
-                </Ui.Cluster>
-              </dd>
-              <dt>Items tracked</dt>
-              <dd>{status.itemCount}</dd>
-              {status.lastError && (
-                <>
-                  <dt>Last error</dt>
-                  <dd className="t-tone-text" data-tone="danger">
-                    {status.lastError}
-                  </dd>
-                </>
-              )}
-            </Ui.Facts>
-          )}
-        </Ui.Section>
+      <SettingsSection id="sync" title="Sync">
+        <Setting
+          label="Active window"
+          description="An item counts as active with activity in this many days. The Active view uses it."
+          state={activeWindow}
+        >
+          <NumberField
+            name="activeWindowDays"
+            min={1}
+            max={365}
+            unit="days"
+            value={activeWindow.value}
+            onValueChange={activeWindow.setValue}
+          />
+        </Setting>
+        <Setting label="Poll interval" description="How often GitHub is asked for new activity." state={poll}>
+          <Duration
+            label="Poll interval"
+            name="pollIntervalMin"
+            units={['minutes', 'hours', 'days']}
+            min={60}
+            value={poll.value}
+            onValueChange={poll.setValue}
+          />
+        </Setting>
+        <Setting
+          label="Maximum backoff"
+          description="After GitHub errors or rate limits, polling slows down up to this."
+          state={backoff}
+        >
+          <Duration
+            label="Maximum backoff"
+            name="backoffMaxMin"
+            units={['minutes', 'hours', 'days']}
+            min={60}
+            value={backoff.value}
+            onValueChange={backoff.setValue}
+          />
+        </Setting>
+        <Setting
+          label="Activity kept per item"
+          description="Recent events stored for the timeline of each item."
+          state={keep}
+        >
+          <NumberField
+            name="activityKeep"
+            min={1}
+            max={500}
+            unit="events"
+            value={keep.value}
+            onValueChange={keep.setValue}
+          />
+        </Setting>
+      </SettingsSection>
 
-        {!settingsLoaded ? (
-          <Ui.Cluster gap="2" align="center" aria-busy="true">
-            <Ui.Spinner size="sm" label={null} />
-            <span className="t-muted">Loading settings…</span>
-          </Ui.Cluster>
-        ) : (
-          <Ui.Settings save={save}>
-            <Ui.Section title="Sync" id="sync">
-              <Ui.Settings.Row
-                label="Active window"
-                htmlFor="activeWindowDays"
-                help={help(
-                  'Active window',
-                  'An item counts as active when it had activity within this many days. Used by the Active view.',
-                )}
-              >
-                <Ui.InputGroup>
-                  <Ui.Input
-                    id="activeWindowDays"
-                    type="number"
-                    min={1}
-                    max={365}
-                    data-setting="activeWindowDays"
-                    defaultValue={settings.activeWindowDays}
-                  />
-                  <Ui.InputAddon>days</Ui.InputAddon>
-                </Ui.InputGroup>
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Poll interval"
-                htmlFor="pollIntervalMin"
-                setting="pollIntervalMin"
-                help={help('Poll interval', 'How often GitHub is checked for new activity.')}
-              >
-                <Ui.DurationInput id="pollIntervalMin" defaultValue={settings.pollIntervalMin * 60} />
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Maximum backoff"
-                htmlFor="backoffMaxMin"
-                setting="backoffMaxMin"
-                help={help(
-                  'Maximum backoff',
-                  'After GitHub errors or rate limiting, polling slows down exponentially up to this limit.',
-                )}
-              >
-                <Ui.DurationInput id="backoffMaxMin" defaultValue={settings.backoffMaxMin * 60} />
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Activity kept per item"
-                htmlFor="activityKeep"
-                help={help(
-                  'Activity kept per item',
-                  "Number of recent events stored for each item's timeline.",
-                )}
-              >
-                <Ui.InputGroup>
-                  <Ui.Input
-                    id="activityKeep"
-                    type="number"
-                    min={1}
-                    max={500}
-                    data-setting="activityKeep"
-                    defaultValue={settings.activityKeep}
-                  />
-                  <Ui.InputAddon>events</Ui.InputAddon>
-                </Ui.InputGroup>
-              </Ui.Settings.Row>
-            </Ui.Section>
+      <SettingsSection id="digest" title="Discord digest" description="Messages about what moved.">
+        <Setting
+          label="Webhook URL"
+          description="A Discord channel webhook (https://discord.com/api/webhooks/…). Empty turns messages off."
+          state={webhook}
+        >
+          <Secret
+            name="discordWebhookUrl"
+            autoComplete="off"
+            placeholder="https://discord.com/api/webhooks/…"
+            value={webhook.value}
+            onValueChange={webhook.setValue}
+          />
+        </Setting>
+        <Setting label="Test message" description="Sends one message to the webhook now.">
+          <TestMessage webhook={settings.discordWebhookUrl} />
+        </Setting>
+        <Setting
+          label="Daily digest"
+          description="One message a day with what still needs you."
+          state={daily}
+        >
+          <Switch
+            name="digestDaily"
+            label="Daily digest"
+            checked={daily.value}
+            onCheckedChange={daily.setValue}
+          />
+        </Setting>
+        <Setting label="Digest hour" description="When the daily digest goes out." state={hour}>
+          <Select name="digestHour" options={HOURS} value={hour.value} onValueChange={hour.setValue} />
+        </Setting>
+        <Setting label="Time zone" description="The zone of the digest hour." state={timezone}>
+          <Combobox
+            name="timezone"
+            options={zones.map((z) => ({ value: z, label: z }))}
+            value={timezone.value}
+            onValueChange={(z) => z && timezone.setValue(z)}
+            placeholder="Type a city"
+          />
+        </Setting>
+        <Setting
+          label="Real-time pings"
+          description="A short message when new activity arrives on something you are part of."
+          state={realtime}
+        >
+          <Switch
+            name="digestRealtime"
+            label="Real-time pings"
+            checked={realtime.value}
+            onCheckedChange={realtime.setValue}
+          />
+        </Setting>
+      </SettingsSection>
 
-            <Ui.Section title="Discord digest" id="digest">
-              <Ui.Settings.Row
-                label="Webhook URL"
-                htmlFor="discordWebhookUrl"
-                help={help(
-                  'Webhook URL',
-                  'Discord channel webhook (https://discord.com/api/webhooks/…). Leave empty to disable notifications.',
-                )}
-              >
-                <div className="webhook">
-                  <Ui.InputGroup className="webhook-input">
-                    <Ui.Input
-                      id="discordWebhookUrl"
-                      type={reveal ? 'text' : 'password'}
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="https://discord.com/api/webhooks/…"
-                      data-setting="discordWebhookUrl"
-                      defaultValue={settings.discordWebhookUrl}
-                    />
-                    <Ui.Button
-                      iconOnly
-                      aria-label={reveal ? 'Hide webhook URL' : 'Show webhook URL'}
-                      tip={reveal ? 'Hide' : 'Show'}
-                      pressed={reveal}
-                      onClick={() => setReveal((r) => !r)}
-                    >
-                      <Ui.Icon name={reveal ? 'bi-eye-slash' : 'bi-eye'} />
-                    </Ui.Button>
-                  </Ui.InputGroup>
-                  <Ui.Button
-                    busy={testing}
-                    disabled={!settings.discordWebhookUrl}
-                    onClick={() => void sendTest()}
-                  >
-                    {sent ? (
-                      <>
-                        <Ui.Icon name="bi-check2" /> Sent
-                      </>
-                    ) : (
-                      <>
-                        <Ui.Icon name="bi-send" /> Send test message
-                      </>
-                    )}
-                  </Ui.Button>
-                </div>
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Daily digest"
-                htmlFor="digestDaily"
-                setting="digestDaily"
-                help={help('Daily digest', 'One message per day listing what still needs you.')}
-              >
-                <Ui.Check
-                  switch
-                  id="digestDaily"
-                  label="Send the daily digest"
-                  defaultChecked={settings.digestDaily}
-                />
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Digest hour"
-                htmlFor="digestHour"
-                help={help('Digest hour', 'Local hour (0–23) the daily digest is sent.')}
-              >
-                <Ui.InputGroup>
-                  <Ui.Input
-                    id="digestHour"
-                    type="number"
-                    min={0}
-                    max={23}
-                    data-setting="digestHour"
-                    defaultValue={settings.digestHour}
-                  />
-                  <Ui.InputAddon>h</Ui.InputAddon>
-                </Ui.InputGroup>
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Timezone"
-                htmlFor="timezone"
-                setting="timezone"
-                help={help('Timezone', 'IANA timezone the digest hour refers to.')}
-              >
-                <Ui.Select id="timezone" defaultValue={settings.timezone}>
-                  {!TIMEZONES.includes(settings.timezone) && (
-                    <option value={settings.timezone}>{settings.timezone}</option>
-                  )}
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
-                  ))}
-                </Ui.Select>
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Real-time pings"
-                htmlFor="digestRealtime"
-                setting="digestRealtime"
-                help={help(
-                  'Real-time pings',
-                  'A short message whenever new activity arrives on something you are involved in.',
-                )}
-              >
-                <Ui.Check
-                  switch
-                  id="digestRealtime"
-                  label="Ping on new activity"
-                  defaultChecked={settings.digestRealtime}
-                />
-              </Ui.Settings.Row>
-            </Ui.Section>
+      <SettingsSection
+        id="appearance"
+        title="Appearance"
+        description="For every browser that opens Octotally."
+      >
+        <Setting label="Skin" description="The design system. Primer is the GitHub look." state={skin}>
+          <Select
+            name="skin"
+            options={choices(theme.config.skins)}
+            value={skin.value}
+            onValueChange={skin.setValue}
+          />
+        </Setting>
+        <Setting
+          label="Palette"
+          description="The colours. Each palette has a dark and a light mode."
+          state={palette}
+        >
+          <Select
+            name="palette"
+            options={choices(theme.config.palettes)}
+            value={palette.value}
+            onValueChange={palette.setValue}
+          />
+        </Setting>
+        {/* The mode button of the side column changes the mode too: the row starts again from the new value. */}
+        <ModeRow key={settings.mode} mode={settings.mode} />
+        <Setting label="Default view" description="The view that opens first." state={defaultView}>
+          <Select
+            name="defaultView"
+            options={views.map((v) => ({ value: v.id, label: v.name }))}
+            value={defaultView.value}
+            onValueChange={defaultView.setValue}
+          />
+        </Setting>
+      </SettingsSection>
+    </Settings>
+  );
+}
 
-            <Ui.Section title="Appearance" id="appearance">
-              <Ui.Settings.Row
-                label="Skin"
-                htmlFor="skin"
-                setting="skin"
-                help={help(
-                  'Skin',
-                  'The design system the page is drawn with. Primer is the GitHub look. The sun/moon button in the footer switches between dark and light.',
-                )}
-              >
-                <Ui.Select id="skin" defaultValue={theme.skin}>
-                  {themeOptions(theme.config, 'skin').map(([id, label]) => (
-                    <option key={id} value={id}>
-                      {label}
-                    </option>
-                  ))}
-                </Ui.Select>
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Palette"
-                htmlFor="palette"
-                setting="palette"
-                help={help('Palette', 'The colours. Every palette has a dark and a light mode.')}
-              >
-                <Ui.Select id="palette" defaultValue={theme.palette}>
-                  {themeOptions(theme.config, 'palette').map(([id, label]) => (
-                    <option key={id} value={id}>
-                      {label}
-                    </option>
-                  ))}
-                </Ui.Select>
-              </Ui.Settings.Row>
-              <Ui.Settings.Row
-                label="Default view"
-                htmlFor="defaultView"
-                setting="defaultView"
-                help={help('Default view', 'The view shown when you open Octotally.')}
-              >
-                <Ui.Select id="defaultView" defaultValue={settings.defaultView}>
-                  {views.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </Ui.Select>
-              </Ui.Settings.Row>
-            </Ui.Section>
-          </Ui.Settings>
-        )}
-      </Ui.Stack>
-    </Ui.AppShell>
+/** The settings of the instance. Each change saves by itself. */
+export function SettingsPage() {
+  const { settings, loaded } = useSettings();
+  const { views, loaded: viewsLoaded } = useViews();
+  return (
+    <Page title="Settings" description="Each change saves by itself." mode="fill" width="readable">
+      {loaded && viewsLoaded ? <Rows settings={settings} views={views} /> : <Skeleton lines={8} />}
+    </Page>
   );
 }

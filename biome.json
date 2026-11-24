@@ -10,6 +10,7 @@
       "!data",
       "!public/tailor",
       "!vendor",
+      "!tailor.json",
       "!.release-please-manifest.json"
     ]
   },

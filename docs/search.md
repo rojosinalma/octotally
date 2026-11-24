@@ -47,11 +47,12 @@ Built-in views are saved searches, stored like any other view:
 | Hidden | `hidden:hidden` |
 
 `{setting}` placeholders are substituted from Settings before parsing, so changing
-`activeWindowDays` changes the Active view. Custom views are created from the search bar ("Save as
+`activeWindowDays` changes the Active view. Custom views are created from a search ("Save as
 view") or via `POST /api/views` (see [api.md](api.md#views)). Built-in views can be renamed and
 reordered but keep their query.
 
 ## Keyboard
 
-`j`/`k` move the selection, `e` marks done, `m` mutes, `o` opens the item on GitHub, `/` focuses
-the search bar and `?` shows the shortcuts dialog.
+`j`/`k` move the cursor, `x` shows the details, `e` marks done, `m` mutes, `u` restores, `o` opens
+the item on GitHub, `s` / `Shift+S` / `Shift+A` select, `Esc` clears the selection, `r` refreshes,
+`/` goes to the filter field and `Shift+?` lists every shortcut.

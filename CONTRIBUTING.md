@@ -48,8 +48,8 @@ warning you should not add to.
 | `packages/server/src/routes` | Hono routes (`/api/*`, `/auth/*`, `/health`), the auth gate, static SPA |
 | `packages/server/src/lib` | GitHub GraphQL client, relevance rules, syncer, poller, digest, notifiers, token source |
 | `packages/server/src/db` | Drizzle schema for SQLite (`schema.ts`) and Postgres (`schema.pg.ts`, change both together); migrations under `src/db/migrations/{sqlite,postgres}` (additive only, `bun run db:generate` writes both) |
-| `packages/web` | React SPA drawn with tailor (`tailor-react`); its own styles in `src/app.css` use `--t-*` tokens only |
-| `public/tailor`, `vendor/tailor-react` | Vendored by tailor's tool (`managed by tailor` header): never edit, sync instead |
+| `packages/web` | React SPA drawn with the tailor React kit (`tailor/<pack>` imports, TanStack Router and Query); no styles of its own |
+| `public/tailor`, `vendor/tailor`, `tailor.json` | Written by the `tailor` command (`tailor add`, `tailor upgrade`, `tailor icons`): never edit by hand. Read `vendor/tailor/REFERENCE.md` before UI work; run `tailor icons` after adding an icon name |
 
 Conventions:
 

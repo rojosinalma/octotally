@@ -1,10 +1,19 @@
 // Mock API for developing the SPA without a GitHub token.
 // Run: bun packages/web/mock/server.ts   (port 3001; MOCK_PORT overrides)
 // Then: VITE_API_TARGET=http://localhost:3001 bun run --filter @octotally/web dev
+// MOCK_ITEMS=<n> sets the number of items (0: an empty instance); MOCK_LONG=1 gives every item a long title,
+// many labels and long repository names, to check the layout under stress; MOCK_TOKEN=0 with MOCK_ITEMS=0 is
+// an instance without a GitHub token.
 import type { Activity, Item, Settings, SyncStatus, View } from '@octotally/shared';
 import { applySearch, BUILTIN_VIEWS, DEFAULT_SETTINGS } from '@octotally/shared';
 
 const port = Number(process.env.MOCK_PORT ?? 3001);
+// MOCK_AUTH=1 asks for the password "mock" first.
+const authRequired = process.env.MOCK_AUTH === '1';
+const MOCK_PASSWORD = 'mock';
+let signedIn = false;
+const ITEM_COUNT = Number(process.env.MOCK_ITEMS ?? 25);
+const LONG = process.env.MOCK_LONG === '1';
 const now = Date.now();
 const H = 3_600_000;
 const D = 24 * H;
@@ -56,9 +65,15 @@ const TITLES = [
   'Theme flashes on first paint when cached theme is dark',
 ];
 
+const LONG_REPOS = REPOS.map(
+  (r, i) => `${r.split('/')[0]}-organisation-with-a-long-name/${r.split('/')[1]}-repository-${i}`,
+);
+const LONG_TITLE =
+  'When the synchronisation of a very large organisation with thousands of repositories runs for longer than the poll interval, the next poll starts before the previous one ends and both write the same rows';
+
 function makeItem(i: number): Item {
   const type: Item['type'] = i % 5 === 0 ? 'discussion' : i % 3 === 0 ? 'pr' : 'issue';
-  const repo = REPOS[i % REPOS.length] as string;
+  const repo = (LONG ? LONG_REPOS : REPOS)[i % REPOS.length] as string;
   const owner = repo.split('/')[0] as string;
   const state: Item['state'] = type === 'pr' && i % 9 === 0 ? 'merged' : i % 7 === 0 ? 'closed' : 'open';
   const activityAgo = (i * 7) % 60 === 0 ? 40 * D : ((i * 11) % 50) * H + i * 13 * 60_000;
@@ -87,17 +102,19 @@ function makeItem(i: number): Item {
     id: `MOCK_${i}`,
     type,
     number: 1000 + i * 3,
-    title: TITLES[i % TITLES.length] as string,
+    title: LONG ? `${LONG_TITLE} (${i})` : (TITLES[i % TITLES.length] as string),
     url: `https://github.com/${repo}/${type === 'pr' ? 'pull' : type === 'discussion' ? 'discussions' : 'issues'}/${1000 + i * 3}`,
     repo,
     owner,
     state,
     isDraft: type === 'pr' && i % 6 === 3,
     author,
-    labels: [
-      LABELS[i % LABELS.length] as string,
-      ...(i % 3 === 0 ? [LABELS[(i + 2) % LABELS.length] as string] : []),
-    ],
+    labels: LONG
+      ? LABELS
+      : [
+          LABELS[i % LABELS.length] as string,
+          ...(i % 3 === 0 ? [LABELS[(i + 2) % LABELS.length] as string] : []),
+        ],
     assignees: i % 5 === 2 ? ['acme-dev'] : [],
     roles,
     commentCount,
@@ -115,7 +132,7 @@ function makeItem(i: number): Item {
   };
 }
 
-const items: Item[] = Array.from({ length: 25 }, (_, i) => makeItem(i));
+const items: Item[] = Array.from({ length: ITEM_COUNT }, (_, i) => makeItem(i));
 let settings: Settings = {
   ...DEFAULT_SETTINGS,
   skin: process.env.MOCK_SKIN ?? DEFAULT_SETTINGS.skin,
@@ -130,9 +147,9 @@ let status: SyncStatus = {
   lastSyncAt: iso(6 * 60_000),
   lastSyncOk: true,
   lastError: null,
-  nextSyncAt: new Date(now + 9 * 60_000).toISOString(),
+  nextSyncAt: process.env.MOCK_TOKEN === '0' ? null : new Date(now + 9 * 60_000).toISOString(),
   syncing: false,
-  githubLogin: 'acme-dev',
+  githubLogin: ITEM_COUNT === 0 && process.env.MOCK_TOKEN === '0' ? null : 'acme-dev',
   githubRateRemaining: 4821,
   githubRateResetAt: new Date(now + 40 * 60_000).toISOString(),
   itemCount: items.length,
@@ -172,9 +189,18 @@ Bun.serve({
         githubRateRemaining: 4821,
       });
     if (p === '/auth/status')
-      return ok('ok', { authenticated: true, required: process.env.MOCK_AUTH === '1' });
-    if (p === '/auth/login') return ok('logged in');
-    if (p === '/auth/logout') return ok('logged out');
+      return ok('ok', { authenticated: !authRequired || signedIn, required: authRequired });
+    if (p === '/auth/login') {
+      const body = (await req.json().catch(() => ({}))) as { password?: unknown };
+      if (body.password !== MOCK_PASSWORD) return err('Wrong password', 'auth', 401);
+      signedIn = true;
+      return ok('logged in');
+    }
+    if (p === '/auth/logout') {
+      signedIn = false;
+      return ok('logged out');
+    }
+    if (authRequired && !signedIn && p.startsWith('/api/')) return err('Sign in first', 'auth', 401);
 
     if (p === '/api/items' && m === 'GET') {
       const q = url.searchParams.get('q') ?? '';
@@ -236,6 +262,7 @@ Bun.serve({
       return ok('Sync started');
     }
     if (p === '/api/status') return ok('ok', { status });
+    if (p === '/api/version') return ok('ok', { version: '0.0.0-mock' });
     if (p === '/api/siblings') {
       if (process.env.MOCK_SIBLINGS === '0') return ok('ok', { siblings: null });
       const now = new Date().toISOString();

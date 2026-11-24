@@ -1,177 +1,212 @@
 import type { Item } from '@octotally/shared';
-import { memo } from 'react';
-import { Ui } from 'tailor-react';
+import { Fragment, type MouseEvent, memo, type ReactElement } from 'react';
+import {
+  Badge,
+  Button,
+  Check,
+  Icon,
+  ListItem,
+  Menu,
+  type MenuItem,
+  RelativeTime,
+  Tooltip,
+  Truncate,
+} from 'tailor/core';
+import { AppLink } from 'tailor/kit/link';
 import type { ItemAction } from '../api';
+import { useMedia } from '../hooks/useMedia';
 import { needsPr, ROLE_LABELS, stateVisual } from '../lib/colors';
-import { absoluteTime, activityLine } from '../lib/format';
 
-interface Props {
-  item: Item;
-  selected: boolean;
-  checked: boolean;
-  onCheck: (shift: boolean) => void;
-  onSelect: () => void;
-  onOpenPanel: () => void;
-  onAction: (action: ItemAction) => void;
+export interface RowHandlers {
+  onCheck: (id: string, range: boolean) => void;
+  onDetails: (id: string) => void;
+  onAction: (item: Item, action: ItemAction) => void;
 }
+
+interface Props extends RowHandlers {
+  item: Item;
+  /** The keyboard cursor (j/k) is on this row. */
+  current: boolean;
+  checked: boolean;
+}
+
+const openOnGitHub = (item: Item) => window.open(item.url, '_blank', 'noopener');
+
+/** One issue, pull request or discussion: box, state, title, where and when, and its actions. */
+const KINDS: Record<Item['type'], string> = { issue: 'Issue', pr: 'Pull request', discussion: 'Discussion' };
+
+/** A pointer and room to spare: the row shows its main action as a button beside the menu. */
+const QUICK_MEDIA = '(pointer: fine) and (min-width: 40rem)';
 
 export const ItemRow = memo(function ItemRow({
   item,
-  selected,
+  current,
   checked,
   onCheck,
-  onSelect,
-  onOpenPanel,
+  onDetails,
   onAction,
 }: Props) {
   const visual = stateVisual(item);
+  const quickShown = useMedia(QUICK_MEDIA);
   const hidden = item.hidden !== 'none';
   const needs = needsPr(item);
-  const [owner, name] = item.repo.split('/');
+  let shift = false;
+  const noteShift = (e: MouseEvent) => {
+    shift = e.shiftKey;
+  };
+
+  const menu: MenuItem[] = [
+    {
+      id: 'details',
+      label: 'Details',
+      icon: <Icon name="bi:info-circle" />,
+      shortcut: 'X',
+      onSelect: () => onDetails(item.id),
+    },
+    {
+      id: 'open',
+      label: 'Open on GitHub',
+      icon: <Icon name="bi:box-arrow-up-right" />,
+      shortcut: 'O',
+      onSelect: () => openOnGitHub(item),
+    },
+    { type: 'separator' },
+    ...(hidden
+      ? [
+          {
+            id: 'restore',
+            label: 'Restore',
+            icon: <Icon name="bi:arrow-counterclockwise" />,
+            shortcut: 'U',
+            onSelect: () => onAction(item, 'restore'),
+          },
+        ]
+      : [
+          {
+            id: 'done',
+            label: 'Mark done',
+            icon: <Icon name="bi:check2" />,
+            shortcut: 'E',
+            onSelect: () => onAction(item, 'done'),
+          },
+          {
+            id: 'mute',
+            label: 'Mute until new activity',
+            icon: <Icon name="bi:bell-slash" />,
+            shortcut: 'M',
+            onSelect: () => onAction(item, 'mute'),
+          },
+        ]),
+  ];
+
+  const quick = hidden
+    ? { action: 'restore' as const, label: 'Restore', icon: 'bi:arrow-counterclockwise' as const }
+    : { action: 'done' as const, label: 'Mark done', icon: 'bi:check2' as const };
+
+  // Inline in the description, one space apart: the line wraps between them.
+  const badges: ReactElement[] = [
+    ...item.roles.map((role) => (
+      <Badge key={`role-${role}`} tone={role === 'author' ? 'accent' : 'neutral'}>
+        {ROLE_LABELS[role]}
+      </Badge>
+    )),
+    ...(hidden
+      ? [
+          <Badge key="hidden" tone={item.hidden === 'done' ? 'accent' : 'warning'}>
+            {item.hidden === 'done' ? 'Done' : 'Muted'}
+          </Badge>,
+        ]
+      : []),
+    ...(needs
+      ? [
+          <Badge key="needs" tone="warning">
+            {item.type === 'discussion' ? 'Unanswered' : 'Needs PR'}
+          </Badge>,
+        ]
+      : []),
+    ...item.labels.map((label) => (
+      <Badge key={`label-${label}`} variant="outline">
+        {label}
+      </Badge>
+    )),
+    ...(item.linkedPrs.length > 0
+      ? [
+          <Badge key="prs" icon={<Icon name="bi:file-diff" label="Linked pull requests" />}>
+            {item.linkedPrs.length}
+          </Badge>,
+        ]
+      : []),
+    ...(item.commentCount > 0
+      ? [
+          <Badge key="comments" icon={<Icon name="bi:chat" label="Comments" />}>
+            {item.commentCount}
+          </Badge>,
+        ]
+      : []),
+  ];
 
   return (
-    <li
-      className="item-row"
-      aria-current={selected ? 'true' : undefined}
-      data-hidden={hidden ? '' : undefined}
-      data-checked={checked ? '' : undefined}
-      data-item-id={item.id}
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest('a, button, label, input')) return;
-        onSelect();
-        onOpenPanel();
-      }}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onOpenPanel();
-        }
-      }}
-      onFocus={onSelect}
-      tabIndex={selected ? 0 : -1}
-    >
-      <label className="item-check" data-tip={checked ? 'Unselect' : 'Select (shift: range)'}>
-        <input
-          type="checkbox"
-          className="t-check-input"
-          checked={checked}
-          tabIndex={-1}
-          onChange={() => undefined}
-          onClick={(e) => {
-            e.stopPropagation();
-            onCheck(e.shiftKey);
-          }}
-        />
-        <span className="t-visually-hidden">Select {item.title}</span>
-      </label>
-      <span className="item-icon t-tone-text" data-tone={visual.tone} data-tip={visual.label}>
-        <Ui.Icon name={visual.icon} label={visual.label} />
-      </span>
-      <div className="item-main">
-        <div className="item-title-line">
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noreferrer"
-            className="item-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {item.title}
-          </a>
-          {item.labels.map((label) => (
-            <Ui.Badge key={label} size="xs" variant="outline">
-              {label}
-            </Ui.Badge>
-          ))}
-        </div>
-        <div className="item-meta t-small t-muted">
-          <span className="item-repo">
-            <span className="t-muted">{owner}/</span>
-            {name} <span className="t-muted">#{item.number}</span>
-          </span>
-          <span aria-hidden="true">·</span>
-          <span data-tip={absoluteTime(item.lastActivityAt)}>{activityLine(item)}</span>
-          {item.roles.map((role) => (
-            <Ui.Badge key={role} size="xs" tone={role === 'author' ? 'accent' : 'neutral'}>
-              {ROLE_LABELS[role]}
-            </Ui.Badge>
-          ))}
-          {hidden && (
-            <Ui.Badge size="xs" tone={item.hidden === 'done' ? 'purple' : 'warning'}>
-              {item.hidden === 'done' ? 'Done' : 'Muted'}
-            </Ui.Badge>
-          )}
-        </div>
-      </div>
-      <div className="item-side t-small t-muted">
-        {needs && item.type === 'issue' && (
-          <Ui.Badge tone="warning" size="xs" data-tip="Open issue without a linked pull request">
-            Needs PR
-          </Ui.Badge>
-        )}
-        {needs && item.type === 'discussion' && (
-          <Ui.Badge tone="warning" size="xs" data-tip="Open discussion without an accepted answer">
-            Unanswered
-          </Ui.Badge>
-        )}
-        {item.linkedPrs.length > 0 && (
-          <span className="item-count" data-tip={`${item.linkedPrs.length} linked pull request(s)`}>
-            <Ui.Icon name="lucide-git-pull-request" /> {item.linkedPrs.length}
-          </span>
-        )}
-        {item.commentCount > 0 && (
-          <span className="item-count" data-tip={`${item.commentCount} comments`}>
-            <Ui.Icon name="lucide-message-square" /> {item.commentCount}
-          </span>
-        )}
-        <span className="item-actions">
-          {hidden ? (
-            <RowAction icon="lucide-history" label="Restore" kbd="u" onClick={() => onAction('restore')} />
-          ) : (
-            <>
-              <RowAction
-                icon="bi-bell-slash"
-                label="Mute until new activity"
-                kbd="m"
-                onClick={() => onAction('mute')}
-              />
-              <RowAction icon="bi-check2" label="Mark done" kbd="e" onClick={() => onAction('done')} />
-            </>
-          )}
-          <RowAction
-            icon="bi-box-arrow-up-right"
-            label="Open on GitHub"
-            kbd="o"
-            onClick={() => window.open(item.url, '_blank', 'noopener')}
+    <ListItem
+      selected={current}
+      leading={
+        <span onClickCapture={noteShift}>
+          <Check
+            label={<span className="t-sr-only">Select {item.title}</span>}
+            checked={checked}
+            onCheckedChange={() => onCheck(item.id, shift)}
           />
         </span>
-      </div>
-    </li>
+      }
+      title={
+        <Truncate lines="2">
+          <AppLink to={item.url} target="_blank" rel="noreferrer" data-item-id={item.id}>
+            {item.title}
+          </AppLink>
+        </Truncate>
+      }
+      description={
+        <>
+          <Badge tone={visual.tone} icon={<Icon name={visual.icon} label={KINDS[item.type]} />}>
+            {visual.word}
+          </Badge>{' '}
+          · {item.repo} #{item.number} ·{' '}
+          {item.lastActivityBy
+            ? `${item.lastActivityBy} ${item.commentCount > 0 ? 'commented' : 'opened'} `
+            : 'updated '}
+          <RelativeTime date={item.lastActivityAt} />
+          {badges.map((badge) => (
+            <Fragment key={badge.key}> {badge}</Fragment>
+          ))}
+        </>
+      }
+      trailing={
+        <>
+          {quickShown ? (
+            <Tooltip text={quick.label}>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Icon name={quick.icon} />}
+                label={quick.label}
+                onClick={() => onAction(item, quick.action)}
+              />
+            </Tooltip>
+          ) : null}
+          <Menu
+            label={`Actions for ${item.title}`}
+            align="end"
+            items={menu}
+            trigger={
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Icon name="bi:three-dots" />}
+                label={`Actions for ${item.title}`}
+              />
+            }
+          />
+        </>
+      }
+    />
   );
 });
-
-function RowAction({
-  icon,
-  label,
-  kbd,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  kbd: string;
-  onClick: () => void;
-}) {
-  return (
-    <Ui.Button
-      variant="ghost"
-      size="xs"
-      iconOnly
-      aria-label={label}
-      tip={`${label} (${kbd})`}
-      onClick={onClick}
-    >
-      <Ui.Icon name={icon} />
-    </Ui.Button>
-  );
-}

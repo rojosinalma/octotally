@@ -1,27 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  applySuggestion,
-  chipsFromQuery,
   hasToken,
   quoteToken,
   removeToken,
   setSingleQualifier,
-  suggest,
   toggleToken,
+  tokenOptions,
 } from '../src/lib/search';
-
-describe('chipsFromQuery', () => {
-  test('qualifiers, text and unknown tokens', () => {
-    const chips = chipsFromQuery('is:open -is:pr label:"help wanted" bogus:1 flaky');
-    expect(chips.map((c) => c.kind)).toEqual(['qualifier', 'qualifier', 'qualifier', 'unknown', 'text']);
-    expect(chips[1]).toMatchObject({ key: 'is', value: 'pr', negated: true, label: '-is:pr' });
-    expect(chips[2]?.label).toBe('label:"help wanted"');
-    expect(chips[4]?.label).toBe('"flaky"');
-  });
-  test('empty query', () => {
-    expect(chipsFromQuery('')).toEqual([]);
-  });
-});
 
 describe('token editing', () => {
   test('toggle adds and removes', () => {
@@ -41,22 +26,20 @@ describe('token editing', () => {
   });
 });
 
-describe('suggest', () => {
-  test('qualifier names', () => {
-    const s = suggest('is:open la');
-    expect(s?.partial).toBe('la');
-    expect(s?.items[0]?.insert).toBe('label:');
-  });
-  test('values with context', () => {
-    const s = suggest('repo:oct', { repos: ['rojosinalma/octotally', 'other/repo'] });
-    expect(s?.items.map((i) => i.insert)).toEqual(['repo:rojosinalma/octotally']);
-    expect(suggest('-is:cl')?.items[0]?.insert).toBe('-is:closed');
-  });
-  test('nothing after whitespace', () => {
-    expect(suggest('is:open ')).toBeNull();
-  });
-  test('applySuggestion', () => {
-    expect(applySuggestion('is:open la', 'la', 'label:')).toBe('is:open label:');
-    expect(applySuggestion('is:open label:b', 'label:b', 'label:bug')).toBe('is:open label:bug ');
+describe('tokenOptions', () => {
+  test('known values, repositories with their owners, labels', () => {
+    const options = tokenOptions({
+      repos: [
+        { repo: 'acme/api', count: 3 },
+        { repo: 'acme/web', count: 1 },
+      ],
+      labels: [['help wanted', 2]],
+    });
+    const byValue = new Map(options.map((o) => [o.value, o]));
+    expect(byValue.get('is:open')?.description).toBe('State or kind');
+    expect(byValue.get('repo:acme/api')?.description).toBe('3 items');
+    expect(byValue.get('org:acme')?.description).toBe('4 items');
+    expect(byValue.get('label:help wanted')?.label).toBe('label:"help wanted"');
+    expect(new Set(options.map((o) => o.value)).size).toBe(options.length);
   });
 });

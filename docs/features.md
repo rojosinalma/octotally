@@ -20,13 +20,14 @@ decide it is done.
 - GitHub-compatible search syntax with relative dates (`updated:>14d`), roles (`role:mentioned`),
   linked PRs (`-linked:pr`) and local state (`hidden:muted`)
 - **Done** and **Mute** per item; a muted item comes back by itself when new activity arrives
-- Item panel with the latest activity, labels, assignees and linked PRs
+- A filter field that offers every value it knows (states, types, roles, repositories, labels, dates) and takes any word; a filter menu for type, state, role and activity
+- Details drawer with the latest activity, labels, assignees and linked PRs
 - Discord digest: daily at a chosen hour and/or near-real-time pings ([notifications.md](notifications.md))
 - **Bulk actions**: a checkbox on every row (Shift+click checks a range) and a select-all box above
-  the list; the bar shows Done, Mute, Restore and Clear for the checked items. More than 20 items ask
+  the list; the bar shows Done, Mute, Restore and Clear selection for the checked items. More than 20 items ask
   first
-- Toasts only for failures and warnings; a successful action just updates the list
-- Keyboard first: `j`/`k` move, `e` done, `m` mute, `o` open on GitHub, `/` search, `?` help, `s` / `Shift+A` select, `Esc` clears the selection
+- Toasts only for failures and warnings; a successful action just updates the list (deleting a view, which asks first, and the test message confirm with a toast)
+- Keyboard first: `j`/`k` move, `x` details, `e` done, `m` mute, `u` restore, `o` open on GitHub, `/` filter, `Shift+?` help, `s` / `Shift+A` select, `Esc` clears the selection
 - Every [tailor](https://github.com/rojosinalma/tailor) skin and palette, in dark and light; the GitHub look (`primer` skin) by default, following the OS ([themes.md](themes.md))
 - JSON API for scripts and agents ([api.md](api.md)), `/health` for monitors ([operations.md](operations.md))
 - Rate-limit aware poller with backoff; cached data is served while GitHub is down
@@ -37,10 +38,10 @@ decide it is done.
 |---|---|---|
 | ![Dashboard, Primer skin, dark](screenshots/dashboard-primer-dark.png) | ![Dashboard, Primer skin, light](screenshots/dashboard-primer-light.png) | ![Dashboard, Pico skin, Nord palette](screenshots/dashboard-pico-nord.png) |
 
-| Item panel | Search autocomplete | Settings |
+| Details drawer | Filter field | Settings |
 |---|---|---|
-| ![Item panel, Primer skin, dark](screenshots/item-panel-primer-dark.png) | ![Search autocomplete, Primer skin, light](screenshots/search-autocomplete-primer-light.png) | ![Settings, Primer skin, dark](screenshots/settings-primer-dark.png) |
+| ![Details drawer, Primer skin, dark](screenshots/item-panel-primer-dark.png) | ![Filter field, Primer skin, light](screenshots/filter-field-primer-light.png) | ![Settings, Primer skin, dark](screenshots/settings-primer-dark.png) |
 
-| Terminal look (WebTUI, Gruvbox) | daisyUI, Catppuccin, light |
+| Terminal look (WebTUI, Gruvbox) | Luz, Catppuccin, light |
 |---|---|
-| ![Dashboard, WebTUI skin, Gruvbox palette](screenshots/dashboard-webtui-gruvbox.png) | ![Dashboard, daisyUI skin, Catppuccin palette, light](screenshots/dashboard-daisyui-catppuccin-light.png) |
+| ![Dashboard, WebTUI skin, Gruvbox palette](screenshots/dashboard-webtui-gruvbox.png) | ![Dashboard, Luz skin, Catppuccin palette, light](screenshots/dashboard-luz-catppuccin-light.png) |

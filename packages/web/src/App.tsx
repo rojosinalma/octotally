@@ -1,76 +1,54 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Ui } from 'tailor-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { RouterProvider } from '@tanstack/react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { routePendingComponent } from 'tailor/core';
 import { api, onAuthError } from './api';
-import { ShortcutsDialog } from './components/ShortcutsDialog';
-import { AppProvider } from './hooks/useApp';
-import { Dashboard } from './pages/Dashboard';
-import { LoginPage } from './pages/Login';
-import { SettingsPage } from './pages/Settings';
-import { useRoute } from './router';
+import { type Auth, AuthContext } from './auth';
+import { SignIn } from './pages/SignIn';
+import { router } from './router';
 import { ThemeSync } from './theme';
 
-type Auth = { state: 'loading' } | { state: 'login' } | { state: 'ready'; required: boolean };
-
-function Routes() {
-  const route = useRoute();
-  const [shortcuts, setShortcuts] = useState(false);
-  const show = useCallback(() => setShortcuts(true), []);
-  return (
-    <>
-      {route.path === '/settings' ? (
-        <SettingsPage onShowShortcuts={show} />
-      ) : (
-        <Dashboard onShowShortcuts={show} />
-      )}
-      <ShortcutsDialog open={shortcuts} onClose={() => setShortcuts(false)} />
-    </>
-  );
-}
-
-function Shell({ children }: { children: ReactNode }) {
-  return <Ui.Provider>{children}</Ui.Provider>;
-}
-
+/** Asks the server whether a password is needed, then shows the sign-in page or the app. */
 export function App() {
-  const [auth, setAuth] = useState<Auth>({ state: 'loading' });
+  const client = useQueryClient();
+  const status = useQuery({
+    queryKey: ['auth'],
+    // No auth endpoint (or the server is down): try the app anyway; API errors show in the pages.
+    queryFn: () => api.authStatus().catch(() => ({ authenticated: true, required: false })),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const [signedOut, setSignedOut] = useState(false);
 
-  const check = useCallback(async () => {
-    try {
-      const r = await api.authStatus();
-      setAuth(r.required && !r.authenticated ? { state: 'login' } : { state: 'ready', required: r.required });
-    } catch {
-      // No auth endpoint (or server down): try the app anyway; API errors surface in the UI.
-      setAuth({ state: 'ready', required: false });
-    }
-  }, []);
+  useEffect(() => onAuthError(() => setSignedOut(true)), []);
 
-  useEffect(() => {
-    void check();
-  }, [check]);
-  useEffect(() => onAuthError(() => setAuth({ state: 'login' })), []);
+  const auth = useMemo<Auth>(
+    () => ({
+      required: status.data?.required ?? false,
+      logout: async () => {
+        try {
+          await api.logout();
+        } finally {
+          setSignedOut(true);
+        }
+      },
+    }),
+    [status.data?.required],
+  );
 
-  if (auth.state === 'loading') {
+  if (!status.data) return routePendingComponent();
+  if (signedOut || (status.data.required && !status.data.authenticated))
     return (
-      <Shell>
-        <div className="app-loading">
-          <Ui.Spinner size="lg" />
-        </div>
-      </Shell>
+      <SignIn
+        onSignedIn={async () => {
+          await client.invalidateQueries();
+          setSignedOut(false);
+        }}
+      />
     );
-  }
-  if (auth.state === 'login') {
-    return (
-      <Shell>
-        <LoginPage onLoggedIn={() => void check()} />
-      </Shell>
-    );
-  }
   return (
-    <Shell>
-      <AppProvider authRequired={auth.required} onLoggedOut={() => setAuth({ state: 'login' })}>
-        <ThemeSync />
-        <Routes />
-      </AppProvider>
-    </Shell>
+    <AuthContext value={auth}>
+      <ThemeSync />
+      <RouterProvider router={router} />
+    </AuthContext>
   );
 }

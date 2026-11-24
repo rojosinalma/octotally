@@ -1,15 +1,4 @@
-import { parseSearch, QUALIFIERS, tokenize } from '@octotally/shared';
-
-export interface Chip {
-  /** Exact token as it appears in the query (unquoted). */
-  token: string;
-  kind: 'qualifier' | 'text' | 'unknown';
-  key?: string;
-  value?: string;
-  negated: boolean;
-  /** Human label, e.g. `-is:pr`, `label:bug`, `"my search"`. */
-  label: string;
-}
+import { tokenize } from '@octotally/shared';
 
 /** Re-quotes a token whose value contains whitespace so it round-trips through `tokenize`. */
 export function quoteToken(token: string): string {
@@ -31,18 +20,6 @@ function splitToken(token: string): { key: string | null; value: string; negated
   const colon = body.indexOf(':');
   if (colon <= 0) return { key: null, value: body, negated: false };
   return { key: body.slice(0, colon).toLowerCase(), value: body.slice(colon + 1), negated };
-}
-
-/** Chips for the active-filter strip; unknown tokens are flagged so the UI can warn inline. */
-export function chipsFromQuery(query: string): Chip[] {
-  const parsed = parseSearch(query);
-  const unknown = new Set(parsed.unknown);
-  return tokenize(query).map((token) => {
-    const { key, value, negated } = splitToken(token);
-    if (key === null) return { token, kind: 'text', negated: false, label: `"${value}"` };
-    if (unknown.has(token)) return { token, kind: 'unknown', key, value, negated, label: quoteToken(token) };
-    return { token, kind: 'qualifier', key, value, negated, label: quoteToken(token) };
-  });
 }
 
 export function hasToken(query: string, token: string): boolean {
@@ -84,40 +61,25 @@ export function qualifierValues(query: string, key: string): string[] {
     .map((s) => s.value);
 }
 
-export interface Suggestion {
-  /** Full token to insert in place of the current partial one. */
-  insert: string;
-  label: string;
-  description?: string;
-}
-
-export interface SuggestContext {
-  repos?: string[];
-  labels?: string[];
-  owners?: string[];
-}
-
+/** What a qualifier filters by: the line under each of its values in the filter field. */
 const QUALIFIER_HELP: Record<string, string> = {
-  is: 'open, closed, merged, draft, issue, pr, discussion, answered, unanswered',
-  type: 'issue, pr, discussion',
-  state: 'open, closed, merged',
-  repo: 'owner/name',
-  org: 'owner',
-  author: 'login or @me',
-  assignee: 'login or @me',
-  mentions: '@me',
-  commenter: '@me',
-  reviewer: '@me',
-  role: 'author, assigned, mentioned, commenter, reviewer',
-  label: 'label name',
-  no: 'label, assignee, linked',
-  linked: 'pr',
-  updated: '>7d, <2w, 2026-01-01..2026-02-01',
-  created: '>7d, <2w, >=2026-01-01',
-  activity: '>7d (same as updated)',
-  comments: '>5, <=1',
-  hidden: 'none, muted, done, any',
-  sort: 'updated-desc, updated-asc, created-desc, created-asc, comments-desc',
+  is: 'State or kind',
+  type: 'Kind',
+  state: 'State',
+  author: 'Opened by',
+  assignee: 'Assigned to',
+  mentions: 'Mentions',
+  commenter: 'Commented by',
+  reviewer: 'Review asked of',
+  role: 'How you are part of it',
+  no: 'Has none',
+  linked: 'Has a linked pull request',
+  updated: 'Last activity, relative (7d = 7 days)',
+  created: 'Opened, relative',
+  activity: 'Last activity, relative',
+  comments: 'Number of comments',
+  hidden: 'Done or muted here',
+  sort: 'Order of the list',
 };
 
 const VALUE_OPTIONS: Record<string, string[]> = {
@@ -140,47 +102,34 @@ const VALUE_OPTIONS: Record<string, string[]> = {
   reviewer: ['@me'],
 };
 
-/** Autocomplete for the last (partial) token of the query; `null` when nothing applies. */
-export function suggest(
-  query: string,
-  ctx: SuggestContext = {},
-  limit = 8,
-): { partial: string; items: Suggestion[] } | null {
-  if (query.length && /\s$/.test(query)) return null;
-  const partial = query.split(/\s+/).pop() ?? '';
-  const negated = partial.startsWith('-');
-  const body = negated ? partial.slice(1) : partial;
-  const colon = body.indexOf(':');
-  const prefix = negated ? '-' : '';
-
-  if (colon < 0) {
-    const needle = body.toLowerCase();
-    const items = QUALIFIERS.filter((q) => q.startsWith(needle)).map((q) => ({
-      insert: `${prefix}${q}:`,
-      label: `${q}:`,
-      description: QUALIFIER_HELP[q],
-    }));
-    return items.length ? { partial, items: items.slice(0, limit) } : null;
-  }
-
-  const key = body.slice(0, colon).toLowerCase();
-  const typed = body.slice(colon + 1).toLowerCase();
-  let values: string[] = [];
-  if (key === 'repo') values = ctx.repos ?? [];
-  else if (key === 'org' || key === 'user' || key === 'owner') values = ctx.owners ?? [];
-  else if (key === 'label') values = ctx.labels ?? [];
-  else values = VALUE_OPTIONS[key] ?? [];
-  const items = values
-    .filter((v) => v.toLowerCase().includes(typed))
-    .sort((a, b) => Number(!a.toLowerCase().startsWith(typed)) - Number(!b.toLowerCase().startsWith(typed)))
-    .slice(0, limit)
-    .map((v) => ({ insert: quoteToken(`${prefix}${key}:${v}`), label: v }));
-  return items.length ? { partial, items } : null;
+export interface TokenOption {
+  /** The token, as `tokenize` returns it. */
+  value: string;
+  /** The token as typed (quoted when it holds a space). */
+  label: string;
+  description?: string;
 }
 
-/** Replaces the trailing partial token with a suggestion. */
-export function applySuggestion(query: string, partial: string, insert: string): string {
-  const base = query.slice(0, query.length - partial.length);
-  const trailingSpace = insert.endsWith(':') ? '' : ' ';
-  return `${base}${insert}${trailingSpace}`;
+const countText = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`;
+
+/** Every token the filter field offers: the qualifier values it knows, and the repositories, owners and labels seen. */
+export function tokenOptions(
+  ctx: { repos?: { repo: string; count: number }[]; labels?: [string, number][] } = {},
+): TokenOption[] {
+  const out = new Map<string, TokenOption>();
+  const add = (token: string, description?: string) => {
+    if (!out.has(token)) out.set(token, { value: token, label: quoteToken(token), description });
+  };
+  for (const [key, values] of Object.entries(VALUE_OPTIONS))
+    for (const value of values) add(`${key}:${value}`, QUALIFIER_HELP[key]);
+  const repos = ctx.repos ?? [];
+  for (const { repo, count } of repos) add(`repo:${repo}`, countText(count));
+  const owners = new Map<string, number>();
+  for (const { repo, count } of repos) {
+    const owner = repo.split('/')[0] ?? repo;
+    owners.set(owner, (owners.get(owner) ?? 0) + count);
+  }
+  for (const [owner, count] of owners) add(`org:${owner}`, countText(count));
+  for (const [label, count] of ctx.labels ?? []) add(`label:${label}`, countText(count));
+  return [...out.values()];
 }

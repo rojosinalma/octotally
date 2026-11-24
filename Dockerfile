@@ -9,7 +9,7 @@ COPY package.json bun.lock ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
-COPY vendor/tailor-react/package.json vendor/tailor-react/
+COPY vendor/tailor/package.json vendor/tailor/
 RUN bun install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ COPY package.json bun.lock ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
-COPY vendor/tailor-react/package.json vendor/tailor-react/
+COPY vendor/tailor/package.json vendor/tailor/
 RUN bun install --frozen-lockfile --production
 
 # ---------------------------------------------------------------------------

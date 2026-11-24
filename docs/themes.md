@@ -1,14 +1,15 @@
 # Themes
 
 Octotally is drawn with [tailor](https://github.com/rojosinalma/tailor), so it comes with every tailor
-skin and palette. A skin is a whole design system (Primer, Pico, daisyUI, a terminal look…); a palette
-is the colours. Every palette has a dark and a light mode.
+skin and palette. A skin is a whole design system (Primer, Bootstrap, Pico, Simple, Luz, a terminal
+look); a palette is the colours. Every palette has a dark and a light mode.
 
 The default is the `primer` skin (the GitHub look), the `ayu` palette and `auto` mode, which follows
 your OS. Change it here:
 
-- The sun/moon button in the footer switches between dark and light.
-- Settings → Appearance picks the skin and the palette.
+- The sun/moon button at the bottom of the side column switches between dark and light.
+- Settings → Appearance picks the skin, the palette and the mode (or "Same as the device" again).
+- A link with `?skin=pico&palette=nord&mode=light` previews a look without saving it.
 - Over the API: `PUT /api/settings {"skin": "pico", "palette": "nord", "mode": "dark"}`.
 
 The choice is stored with the other settings, so every browser opens with the same look. The browser
@@ -16,11 +17,17 @@ also keeps a copy so the page paints in the right colours before the settings lo
 
 ## Where the files come from
 
-`public/tailor/` (CSS, skins, palettes, icon sprite and the head snippet) and `vendor/tailor-react/`
-(the React components) are copied in by tailor's own tool. They carry a `managed by tailor` header:
-don't edit them by hand. New skins and palettes arrive when they are synced again. The app's own
-styles are in `packages/web/src/app.css` and only use tailor's `--t-*` colour variables, so they follow
-whichever palette is picked.
+`public/tailor/` (CSS, skins, palettes, icon sprite and the head lines) and `vendor/tailor/` (the
+React kit) are written by the `tailor` command and listed in `tailor.json`: don't edit them by hand.
+New skins and palettes arrive with `tailor upgrade`; `tailor icons` rebuilds the icon sprite from the
+icon names in the source. The app has no styles of its own, so every part follows the skin and the
+palette that are picked.
+
+## Upgrading from 0.5
+
+0.5 drew the UI with tailor 0.x, which had more skins. A stored skin that tailor 2 no longer has
+(`daisyui`, `govuk`, `tufte`, `none`) is ignored: the page shows the skin the browser last used, or
+`primer`, until another skin is picked in Settings → Appearance.
 
 ## Upgrading from 0.3
 

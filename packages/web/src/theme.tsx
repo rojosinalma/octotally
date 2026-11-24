@@ -1,65 +1,63 @@
-// Skin, palette and mode: tailor's switcher (tailor-react) on the stored app settings.
+// Skin, palette and mode: tailor's theme on the page, kept in step with the stored settings.
 //
-// The vendored head snippet (public/tailor/tailor-head.html) paints the cached choice before the first
-// render; the server settings win once they load. Changes made with the pickers (footer mode toggle) are
-// written back to the settings, so every browser opens with the same look.
+// The head snippet (public/tailor/head.html) paints the choice cached in this browser before the first render;
+// the server settings win once they load, so every browser opens with the same look. A change made on the
+// page (the mode button, the Appearance rows) is written back to the settings. A `?skin=`, `?palette=` or
+// `?mode=` in the address previews that value and is never saved.
 import type { Settings } from '@octotally/shared';
 import { useEffect, useRef } from 'react';
-import { setTailorTheme, type TailorThemeChange } from 'tailor-react';
-import { useApp } from './hooks/useApp';
+import { useTheme } from 'tailor/core';
+import { useSettingsQuery, useUpdateSettings } from './queries';
 
-let applying = false;
+type ThemeKey = 'skin' | 'palette' | 'mode';
+const THEME_KEYS: readonly ThemeKey[] = ['skin', 'palette', 'mode'];
 
-/** Sets the page theme without writing it back to the settings (the caller already saved it). */
-export function applyTheme(change: TailorThemeChange): void {
-  applying = true;
-  try {
-    setTailorTheme(change);
-  } finally {
-    applying = false;
-  }
-}
+const fromAddress = (key: ThemeKey): boolean => new URLSearchParams(window.location.search).has(key);
 
-type ThemeKeys = Pick<Settings, 'skin' | 'palette' | 'mode'>;
+/** The mode to show for a stored choice: `auto` follows the device. */
+export const resolveMode = (mode: Settings['mode']): 'dark' | 'light' =>
+  mode === 'auto' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : mode;
 
-/** What the page shows now, in settings terms. */
-function pageTheme(): ThemeKeys {
-  const d = document.documentElement.dataset;
-  const choice = d.modeChoice ?? d.mode;
-  return {
-    skin: d.skin ?? '',
-    palette: d.palette ?? '',
-    mode: choice === 'dark' || choice === 'light' ? choice : 'auto',
-  };
-}
-
-/** Keeps the page theme and the `skin`/`palette`/`mode` settings in step. Renders nothing. */
+/** Keeps the page theme and the `skin`, `palette` and `mode` settings in step. Renders nothing. */
 export function ThemeSync() {
-  const { settings, settingsLoaded, updateSettings } = useApp();
-  const latest = useRef({ settings, settingsLoaded, updateSettings });
-  latest.current = { settings, settingsLoaded, updateSettings };
+  const theme = useTheme();
+  const settings = useSettingsQuery().data;
+  const save = useUpdateSettings();
+  const applying = useRef(false);
+  const latest = useRef({ settings, save });
+  latest.current = { settings, save };
 
-  // Server → page: once the settings arrive, and whenever another tab or client changed them.
+  // Server → page: once the settings arrive, and whenever they change.
   useEffect(() => {
-    if (!settingsLoaded) return;
-    applyTheme({ skin: settings.skin, palette: settings.palette, mode: settings.mode });
-  }, [settingsLoaded, settings.skin, settings.palette, settings.mode]);
+    if (!settings) return;
+    const change: { skin?: string; palette?: string; mode?: 'dark' | 'light' } = {};
+    if (!fromAddress('skin')) change.skin = settings.skin;
+    if (!fromAddress('palette')) change.palette = settings.palette;
+    if (!fromAddress('mode')) change.mode = resolveMode(settings.mode);
+    applying.current = true;
+    try {
+      theme.set(change);
+    } finally {
+      applying.current = false;
+    }
+  }, [settings, theme.set]);
 
-  // Page → server: a picker changed the theme.
+  // Page → server: a control on the page changed the theme.
   useEffect(() => {
-    const onTheme = () => {
-      const { settings: s, settingsLoaded: loaded, updateSettings: save } = latest.current;
-      if (applying || !loaded) return;
-      const now = pageTheme();
-      const patch: Partial<ThemeKeys> = {};
-      if (now.skin && now.skin !== s.skin) patch.skin = now.skin;
-      if (now.palette && now.palette !== s.palette) patch.palette = now.palette;
-      if (now.mode !== s.mode) patch.mode = now.mode;
-      if (Object.keys(patch).length) void save(patch, { silent: true });
+    const onTheme = (event: Event) => {
+      const { settings: s, save: write } = latest.current;
+      if (applying.current || !s || !(event instanceof CustomEvent)) return;
+      const now = event.detail as Record<ThemeKey, string>;
+      const patch: Partial<Pick<Settings, ThemeKey>> = {};
+      for (const key of THEME_KEYS) {
+        if (fromAddress(key)) continue;
+        const shown = key === 'mode' ? resolveMode(s.mode) : s[key];
+        if (now[key] && now[key] !== shown) Object.assign(patch, { [key]: now[key] });
+      }
+      if (Object.keys(patch).length) void write(patch);
     };
-    const html = document.documentElement;
-    html.addEventListener('t:theme', onTheme);
-    return () => html.removeEventListener('t:theme', onTheme);
+    document.addEventListener('t:theme', onTheme);
+    return () => document.removeEventListener('t:theme', onTheme);
   }, []);
 
   return null;

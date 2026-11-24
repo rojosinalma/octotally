@@ -9,7 +9,7 @@ describe('stateVisual', () => {
     });
     expect(stateVisual({ type: 'issue', state: 'closed', isDraft: false, isAnswered: null })).toMatchObject({
       icon: ICONS.issueClosed,
-      tone: 'purple',
+      tone: 'accent',
     });
   });
   test('pull requests', () => {
@@ -23,7 +23,7 @@ describe('stateVisual', () => {
     });
     expect(stateVisual({ type: 'pr', state: 'merged', isDraft: false, isAnswered: null })).toMatchObject({
       icon: ICONS.merged,
-      tone: 'purple',
+      tone: 'accent',
     });
     expect(stateVisual({ type: 'pr', state: 'closed', isDraft: false, isAnswered: null })).toMatchObject({
       icon: ICONS.prClosed,
@@ -38,7 +38,7 @@ describe('stateVisual', () => {
       tone: 'success',
     });
     expect(stateVisual({ type: 'discussion', state: 'open', isDraft: false, isAnswered: true }).tone).toBe(
-      'purple',
+      'accent',
     );
   });
 });
