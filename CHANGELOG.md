@@ -3,6 +3,18 @@
 All notable changes to Octotally are documented here. The file is maintained by
 [release-please](https://github.com/googleapis/release-please) from conventional commit messages.
 
+## [0.6.0](https://github.com/rojosinalma/octotally/compare/v0.5.0...v0.6.0) (2026-11-24)
+
+
+### Features
+
+* draw the UI with the tailor 2 React kit ([b774ba0](https://github.com/rojosinalma/octotally/commit/b774ba0ecbbc726b737d4897f5990f28a13bc6db))
+
+
+### Bug fixes
+
+* track the vendored tailor data pack (the data/ ignore rule matched it) ([0889b59](https://github.com/rojosinalma/octotally/commit/0889b5992b04123fa93dfad7540a80202c920aa8))
+
 ## [0.5.0](https://github.com/rojosinalma/octotally/compare/v0.4.0...v0.5.0) (2026-10-29)
 
 
